@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { AdminHeader } from "@/components/AdminHeader"
 import { StatusBadge } from "@/components/StatusBadge"
@@ -11,100 +11,85 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
 import { Search, Filter, Plus, MoreHorizontal, Eye, Edit, Trash2, RefreshCw, Download, Copy } from "lucide-react"
-
-const licenses = [
-  {
-    id: "LIC-2024-001",
-    customer: "Acme Corporation",
-    product: "Enterprise Suite",
-    type: "Perpetual",
-    status: "valid",
-    expiration: "2025-12-31",
-    activations: "5/10",
-  },
-  {
-    id: "LIC-2024-002",
-    customer: "TechStart Inc.",
-    product: "Professional",
-    type: "Trial",
-    status: "trial",
-    expiration: "2024-02-15",
-    activations: "2/3",
-  },
-  {
-    id: "LIC-2024-003",
-    customer: "GlobalTech Ltd.",
-    product: "Enterprise Suite",
-    type: "Subscription",
-    status: "expiring",
-    expiration: "2024-01-20",
-    activations: "28/30",
-  },
-  {
-    id: "LIC-2024-004",
-    customer: "InnovateCo",
-    product: "Standard",
-    type: "Annual",
-    status: "valid",
-    expiration: "2024-08-15",
-    activations: "8/10",
-  },
-  {
-    id: "LIC-2024-005",
-    customer: "DataFlow Systems",
-    product: "Enterprise Suite",
-    type: "Subscription",
-    status: "expired",
-    expiration: "2023-12-01",
-    activations: "15/15",
-  },
-  {
-    id: "LIC-2024-006",
-    customer: "CloudNine Tech",
-    product: "Professional",
-    type: "Annual",
-    status: "valid",
-    expiration: "2024-11-30",
-    activations: "12/20",
-  },
-  {
-    id: "LIC-2024-007",
-    customer: "StartupHub",
-    product: "Standard",
-    type: "Trial",
-    status: "trial",
-    expiration: "2024-01-25",
-    activations: "1/3",
-  },
-  {
-    id: "LIC-2024-008",
-    customer: "MegaCorp Industries",
-    product: "Enterprise Suite",
-    type: "Perpetual",
-    status: "valid",
-    expiration: "Never",
-    activations: "45/100",
-  },
-]
+import { getApiErrorMessage, licensesApi } from "@/lib/api"
+import { formatDate, getLicenseStatus } from "@/lib/formatters"
 
 export default function LicensesPage() {
+  const [licenses, setLicenses] = useState([])
   const [selectedLicenses, setSelectedLicenses] = useState([])
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [productFilter, setProductFilter] = useState("all")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetchLicenses = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { data } = await licensesApi.list()
+      setLicenses(data)
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to load licenses"))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchLicenses()
+  }, [])
+
+  const productOptions = useMemo(() => {
+    return [...new Set(licenses.map((license) => license.product_name).filter(Boolean))]
+  }, [licenses])
+
+  const filteredLicenses = useMemo(() => {
+    const query = searchQuery.toLowerCase()
+
+    return licenses.filter((license) => {
+      const status = getLicenseStatus(license)
+      const matchesSearch =
+        !query ||
+        license.license_key?.toLowerCase().includes(query) ||
+        String(license.id).includes(query) ||
+        license.customer_username?.toLowerCase().includes(query) ||
+        license.customer_email?.toLowerCase().includes(query) ||
+        license.product_name?.toLowerCase().includes(query)
+      const matchesStatus = statusFilter === "all" || status === statusFilter
+      const matchesProduct = productFilter === "all" || license.product_name === productFilter
+
+      return matchesSearch && matchesStatus && matchesProduct
+    })
+  }, [licenses, productFilter, searchQuery, statusFilter])
 
   const toggleSelectAll = () => {
-    if (selectedLicenses.length === licenses.length) {
+    if (selectedLicenses.length === filteredLicenses.length) {
       setSelectedLicenses([])
     } else {
-      setSelectedLicenses(licenses.map((l) => l.id))
+      setSelectedLicenses(filteredLicenses.map((license) => String(license.id)))
     }
   }
 
   const toggleSelect = (id) => {
-    if (selectedLicenses.includes(id)) {
-      setSelectedLicenses(selectedLicenses.filter((l) => l !== id))
+    const licenseId = String(id)
+
+    if (selectedLicenses.includes(licenseId)) {
+      setSelectedLicenses(selectedLicenses.filter((selectedId) => selectedId !== licenseId))
     } else {
-      setSelectedLicenses([...selectedLicenses, id])
+      setSelectedLicenses([...selectedLicenses, licenseId])
     }
+  }
+
+  const copyLicenseKey = async (licenseKey) => {
+    if (!licenseKey) {
+      return
+    }
+
+    await navigator.clipboard.writeText(licenseKey)
   }
 
   return (
@@ -118,9 +103,14 @@ export default function LicensesPage() {
               <div className="flex flex-wrap gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder="Search licenses..." className="pl-9 w-64 bg-input border-border" />
+                  <Input
+                    placeholder="Search licenses..."
+                    className="pl-9 w-64 bg-input border-border"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                  />
                 </div>
-                <Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-40 bg-input border-border">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -130,17 +120,20 @@ export default function LicensesPage() {
                     <SelectItem value="expired">Expired</SelectItem>
                     <SelectItem value="expiring">Expiring Soon</SelectItem>
                     <SelectItem value="trial">Trial</SelectItem>
+                    <SelectItem value="disabled">Disabled</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select>
+                <Select value={productFilter} onValueChange={setProductFilter}>
                   <SelectTrigger className="w-40 bg-input border-border">
                     <SelectValue placeholder="Product" />
                   </SelectTrigger>
                   <SelectContent className="glass-strong border-border">
                     <SelectItem value="all">All Products</SelectItem>
-                    <SelectItem value="enterprise">Enterprise Suite</SelectItem>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="standard">Standard</SelectItem>
+                    {productOptions.map((productName) => (
+                      <SelectItem key={productName} value={productName}>
+                        {productName}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Button variant="outline" className="border-border bg-transparent">
@@ -186,51 +179,67 @@ export default function LicensesPage() {
           </Card>
         )}
 
+        {loading && <LoadingState message="Loading licenses..." />}
+
+        {error && !loading && <ErrorState message={error} onRetry={fetchLicenses} />}
+
+        {!loading && !error && filteredLicenses.length === 0 && (
+          <EmptyState message="No licenses found" />
+        )}
+
+        {!loading && !error && filteredLicenses.length > 0 && (
         <Card className="glass border-border overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="w-12">
-                  <Checkbox checked={selectedLicenses.length === licenses.length} onCheckedChange={toggleSelectAll} />
+                  <Checkbox
+                    checked={selectedLicenses.length === filteredLicenses.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
                 </TableHead>
                 <TableHead className="text-muted-foreground">License ID</TableHead>
                 <TableHead className="text-muted-foreground">Customer</TableHead>
                 <TableHead className="text-muted-foreground">Product</TableHead>
-                <TableHead className="text-muted-foreground">Type</TableHead>
                 <TableHead className="text-muted-foreground">Status</TableHead>
                 <TableHead className="text-muted-foreground">Expiration</TableHead>
-                <TableHead className="text-muted-foreground">Activations</TableHead>
+                <TableHead className="text-muted-foreground">Created</TableHead>
                 <TableHead className="text-muted-foreground w-12">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {licenses.map((license) => (
+              {filteredLicenses.map((license) => (
                 <TableRow
                   key={license.id}
                   className="border-border hover:bg-secondary/30 transition-colors cursor-pointer group"
                 >
                   <TableCell>
                     <Checkbox
-                      checked={selectedLicenses.includes(license.id)}
+                      checked={selectedLicenses.includes(String(license.id))}
                       onCheckedChange={() => toggleSelect(license.id)}
                     />
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <code className="text-sm font-mono text-primary">{license.id}</code>
-                      <button className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <code className="text-sm font-mono text-primary max-w-48 truncate">
+                        {license.license_key || `#${license.id}`}
+                      </code>
+                      <button
+                        type="button"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => copyLicenseKey(license.license_key)}
+                      >
                         <Copy className="w-3 h-3 text-muted-foreground hover:text-foreground" />
                       </button>
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium text-foreground">{license.customer}</TableCell>
-                  <TableCell className="text-muted-foreground">{license.product}</TableCell>
-                  <TableCell className="text-muted-foreground">{license.type}</TableCell>
+                  <TableCell className="font-medium text-foreground">{license.customer_username || "N/A"}</TableCell>
+                  <TableCell className="text-muted-foreground">{license.product_name || "N/A"}</TableCell>
                   <TableCell>
-                    <StatusBadge status={license.status} />
+                    <StatusBadge status={getLicenseStatus(license)} />
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{license.expiration}</TableCell>
-                  <TableCell className="text-muted-foreground">{license.activations}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(license.expiration_at)}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(license.created_at)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -265,9 +274,12 @@ export default function LicensesPage() {
             </TableBody>
           </Table>
         </Card>
+        )}
 
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">Showing 1-8 of 847 licenses</p>
+          <p className="text-sm text-muted-foreground">
+            Showing {filteredLicenses.length} of {licenses.length} licenses
+          </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" className="border-border bg-transparent" disabled>
               Previous

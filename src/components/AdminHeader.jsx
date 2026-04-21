@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Bell, Search, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,8 +12,36 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { authApi } from "@/lib/api"
 
 export function AdminHeader({ title, subtitle }) {
+  const navigate = useNavigate()
+  const [profile, setProfile] = useState(null)
+  const [profileError, setProfileError] = useState(null)
+
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+
+    if (!token) {
+      return
+    }
+
+    authApi
+      .profile()
+      .then(({ data }) => {
+        setProfile(data.user || data)
+        setProfileError(null)
+      })
+      .catch(() => {
+        setProfileError("Profile unavailable")
+      })
+  }, [])
+
+  const handleLogout = () => {
+    localStorage.removeItem("token")
+    navigate("/")
+  }
+
   return (
     <header className="sticky top-0 z-40 glass-strong border-b border-border px-6 py-4">
       <div className="flex items-center justify-between">
@@ -59,16 +89,16 @@ export function AdminHeader({ title, subtitle }) {
                 <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
                   <User className="w-4 h-4 text-primary" />
                 </div>
-                <span className="hidden md:block text-sm">Admin</span>
+                <span className="hidden md:block text-sm">{profile?.username || "Admin"}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="glass-strong border-border">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
+              <DropdownMenuItem>{profile?.email || profileError || "Profile"}</DropdownMenuItem>
               <DropdownMenuItem>Settings</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">Logout</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive" onClick={handleLogout}>Logout</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

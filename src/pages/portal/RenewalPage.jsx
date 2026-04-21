@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { MinotaurLogo } from "@/components/MinotaurLogo"
 import { ParticlesBackground } from "@/components/ParticlesBackground"
@@ -9,8 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
 import { cn } from "@/lib/utils"
-import { ArrowLeft, Check, CreditCard, Star, Shield } from "lucide-react"
+import { ArrowLeft, Check, CreditCard, Loader2, Star, Shield } from "lucide-react"
+import { customersApi, getApiErrorMessage, paymentsApi } from "@/lib/api"
 
 const plans = [
   {
@@ -38,10 +40,66 @@ export default function RenewalPage() {
   const [selectedPlan, setSelectedPlan] = useState("premium")
   const [selectedDuration, setSelectedDuration] = useState("1y")
   const [step, setStep] = useState(1)
+  const [customer, setCustomer] = useState(null)
+  const [licenses, setLicenses] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
+  const [paymentError, setPaymentError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [recordedPayment, setRecordedPayment] = useState(null)
 
   const plan = plans.find((p) => p.id === selectedPlan)
   const duration = durations.find((d) => d.id === selectedDuration)
   const totalPrice = plan.price * duration.multiplier
+  const primaryLicense = licenses[0]
+
+  const fetchRenewalContext = async () => {
+    setLoading(true)
+    setLoadError(null)
+
+    try {
+      const customerResponse = await customersApi.current()
+      const licensesResponse = await customersApi.licenses(customerResponse.data.id)
+      setCustomer(customerResponse.data)
+      setLicenses(licensesResponse.data)
+    } catch (err) {
+      setLoadError(getApiErrorMessage(err, "Failed to load renewal data"))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchRenewalContext()
+  }, [])
+
+  const handlePayment = async () => {
+    setPaymentError(null)
+
+    if (!customer || !primaryLicense) {
+      setPaymentError("A customer and license are required to record a payment")
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      const { data } = await paymentsApi.create({
+        customer_id: customer.id,
+        license_id: primaryLicense.id,
+        amount: totalPrice.toFixed(2),
+        currency: "USD",
+        method: "card",
+        status: "paid",
+      })
+      setRecordedPayment(data.payment)
+      setStep(3)
+    } catch (err) {
+      setPaymentError(getApiErrorMessage(err, "Failed to record payment"))
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen relative">
@@ -64,6 +122,14 @@ export default function RenewalPage() {
       </header>
 
       <main className="relative z-10 max-w-4xl mx-auto px-6 py-8">
+        {loading && <LoadingState message="Loading renewal data..." />}
+
+        {loadError && !loading && <ErrorState message={loadError} onRetry={fetchRenewalContext} />}
+
+        {!loading && !loadError && !primaryLicense && <EmptyState message="No license found for renewal" />}
+
+        {!loading && !loadError && primaryLicense && (
+        <>
         {/* Progress Steps */}
         <div className="flex items-center justify-center mb-8">
           {[1, 2, 3].map((s) => (
@@ -250,11 +316,14 @@ export default function RenewalPage() {
               <Button variant="outline" onClick={() => setStep(1)} className="flex-1 border-border bg-transparent">
                 Back
               </Button>
+              {paymentError && <p className="flex-1 text-sm text-destructive self-center">{paymentError}</p>}
               <Button
-                onClick={() => setStep(3)}
+                onClick={handlePayment}
+                disabled={submitting}
                 className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground glow-blue"
               >
-                Complete Payment
+                {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                {submitting ? "Recording..." : "Complete Payment"}
               </Button>
             </div>
           </div>
@@ -267,8 +336,11 @@ export default function RenewalPage() {
               <Check className="w-10 h-10 text-success" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground mb-2">Payment Successful!</h1>
-              <p className="text-muted-foreground">Your license has been renewed successfully</p>
+              <h1 className="text-2xl font-bold text-foreground mb-2">Payment Recorded!</h1>
+              <p className="text-muted-foreground">Your renewal payment has been recorded successfully</p>
+              {recordedPayment && (
+                <p className="text-xs text-muted-foreground mt-2">Payment #{recordedPayment.id} recorded</p>
+              )}
             </div>
 
             <Card className="glass border-border neon-border max-w-md mx-auto">
@@ -287,7 +359,7 @@ export default function RenewalPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">New Expiry</span>
-                  <span className="text-foreground font-medium">Dec 31, 2025</span>
+                  <span className="text-foreground font-medium">Pending license update</span>
                 </div>
               </CardContent>
             </Card>
@@ -301,6 +373,8 @@ export default function RenewalPage() {
               <Link to="/portal">Return to Dashboard</Link>
             </Button>
           </div>
+        )}
+        </>
         )}
       </main>
     </div>

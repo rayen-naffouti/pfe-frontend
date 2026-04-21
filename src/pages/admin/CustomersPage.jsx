@@ -9,40 +9,44 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
+import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
 import { Search, Plus, Filter, User, Key, Mail, Calendar } from "lucide-react"
-import api from "../../lib/axios"
+import { customersApi, getApiErrorMessage } from "@/lib/api"
+import { formatDate } from "@/lib/formatters"
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedCustomer, setSelectedCustomer] = useState(null)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const fetchCustomers = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { data } = await customersApi.list()
+      setCustomers(data)
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to load customers"))
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchCustomers = async () => {
-      try {
-        const res = await api.get("/customers")
-        setCustomers(res.data)
-      } catch (err) {
-        console.error(err)
-        setError("Failed to load customers")
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchCustomers()
   }, [])
 
-  const formatDate = (isoString) => {
-    if (!isoString) return "N/A";
-    const date = new Date(isoString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  const filteredCustomers = customers.filter((customer) => {
+    const query = searchQuery.toLowerCase()
+
+    return (
+      customer.username?.toLowerCase().includes(query) ||
+      customer.email?.toLowerCase().includes(query)
+    )
+  })
 
   return (
     <div className="min-h-screen">
@@ -56,7 +60,12 @@ export default function CustomersPage() {
               <div className="flex gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder="Search customers..." className="pl-9 w-64 bg-input border-border" />
+                  <Input
+                    placeholder="Search customers..."
+                    className="pl-9 w-64 bg-input border-border"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                  />
                 </div>
                 <Button variant="outline" className="border-border bg-transparent">
                   <Filter className="w-4 h-4 mr-2" />
@@ -73,18 +82,15 @@ export default function CustomersPage() {
           </CardContent>
         </Card>
 
-        {/* Loading state */}
-        {loading && (
-          <p className="text-center text-muted-foreground">Loading customers...</p>
+        {loading && <LoadingState message="Loading customers..." />}
+
+        {error && !loading && <ErrorState message={error} onRetry={fetchCustomers} />}
+
+        {!loading && !error && filteredCustomers.length === 0 && (
+          <EmptyState message="No customers found" />
         )}
 
-        {/* Error state */}
-        {error && (
-          <p className="text-center text-destructive">{error}</p>
-        )}
-
-        {/* Customer Table */}
-        {!loading && !error && (
+        {!loading && !error && filteredCustomers.length > 0 && (
           <Card className="glass border-border overflow-hidden">
             <Table>
               <TableHeader>
@@ -98,7 +104,7 @@ export default function CustomersPage() {
               </TableHeader>
 
               <TableBody>
-                {customers.map((customer) => (
+                {filteredCustomers.map((customer) => (
                   <TableRow
                     key={customer.id}
                     className="border-border hover:bg-secondary/30 transition-colors cursor-pointer"

@@ -9,34 +9,44 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { Copy, Check, Play, Key, Shield, Terminal, FileCode, Lock } from "lucide-react"
+import { Copy, Check, Play, Key, Shield, Terminal, FileCode, Lock, Loader2 } from "lucide-react"
+import api from "@/lib/axios"
+import { getApiErrorMessage } from "@/lib/api"
 
 const endpoints = [
-  { method: "POST", path: "/api/v1/licenses/verify", description: "Verify a license key" },
-  { method: "GET", path: "/api/v1/licenses/{id}", description: "Get license details" },
-  { method: "POST", path: "/api/v1/licenses/activate", description: "Activate a license" },
-  { method: "POST", path: "/api/v1/licenses/deactivate", description: "Deactivate a license" },
-  { method: "GET", path: "/api/v1/licenses/{id}/status", description: "Check license status" },
+  { method: "POST", path: "/api/auth/register", description: "Register through auth route" },
+  { method: "POST", path: "/api/auth/login", description: "Login and receive a token" },
+  { method: "GET", path: "/api/auth/profile", description: "Get authenticated profile" },
+  { method: "POST", path: "/api/customers/register", description: "Register a customer" },
+  { method: "GET", path: "/api/customers", description: "List customers" },
+  { method: "GET", path: "/api/customers/{id}", description: "Get customer details" },
+  { method: "GET", path: "/api/customer", description: "Get current customer" },
+  { method: "GET", path: "/api/products", description: "List products" },
+  { method: "POST", path: "/api/products", description: "Create product" },
+  { method: "GET", path: "/api/licenses", description: "List licenses" },
+  { method: "POST", path: "/api/licenses", description: "Create license" },
+  { method: "GET", path: "/api/licenses/{id}", description: "Get license details" },
+  { method: "GET", path: "/api/customers/{customerId}/licenses", description: "List customer licenses" },
+  { method: "POST", path: "/api/payments", description: "Record payment" },
+  { method: "GET", path: "/api/customers/{customerId}/payments", description: "List customer payments" },
+  { method: "GET", path: "/api/licenses/{licenseId}/history", description: "List license history" },
 ]
 
 const exampleRequest = `{
-  "license_key": "LIC-2024-001-ACME-XXXX-YYYY-ZZZZ",
-  "hardware_id": "a1b2c3d4e5f6",
-  "product_id": "enterprise-suite"
+  "customer_id": 1,
+  "product_id": 1,
+  "status": "trial",
+  "expiration_at": "2026-12-31"
 }`
 
 const exampleResponse = `{
-  "valid": true,
   "license": {
-    "id": "LIC-2024-001",
-    "customer": "Acme Corporation",
-    "product": "Enterprise Suite",
-    "type": "perpetual",
-    "status": "active",
-    "expiration": "2025-12-31T23:59:59Z",
-    "activations": { "current": 5, "max": 10 }
-  },
-  "signature": "eyJhbGciOiJSUzI1NiIs..."
+    "id": 1,
+    "status": "trial",
+    "customer_id": 1,
+    "product_id": 1,
+    "expiration_at": "2026-12-31T00:00:00.000Z"
+  }
 }`
 
 const rsaPublicKey = `-----BEGIN PUBLIC KEY-----
@@ -47,6 +57,12 @@ MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2mKqH...
 export default function ApiConsolePage() {
   const [copied, setCopied] = useState(null)
   const [testResult, setTestResult] = useState(null)
+  const [testError, setTestError] = useState(null)
+  const [testStatus, setTestStatus] = useState(null)
+  const [testing, setTesting] = useState(false)
+  const [method, setMethod] = useState("GET")
+  const [endpoint, setEndpoint] = useState("/api/licenses")
+  const [requestBody, setRequestBody] = useState(exampleRequest)
 
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text)
@@ -54,7 +70,33 @@ export default function ApiConsolePage() {
     setTimeout(() => setCopied(null), 2000)
   }
 
-  const runTest = () => setTestResult(exampleResponse)
+  const runTest = async () => {
+    setTesting(true)
+    setTestError(null)
+    setTestResult(null)
+    setTestStatus(null)
+
+    try {
+      const url = endpoint.replace(/^\/api/, "")
+      const payload = method === "GET" ? undefined : JSON.parse(requestBody || "{}")
+      const response = await api.request({
+        method,
+        url,
+        data: payload,
+      })
+
+      setTestStatus(response.status)
+      setTestResult(JSON.stringify(response.data, null, 2))
+    } catch (err) {
+      setTestStatus(err.response?.status || null)
+      setTestError(err instanceof SyntaxError ? "Request body must be valid JSON" : getApiErrorMessage(err, "API request failed"))
+      if (err.response?.data) {
+        setTestResult(JSON.stringify(err.response.data, null, 2))
+      }
+    } finally {
+      setTesting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen">
@@ -159,14 +201,22 @@ export default function ApiConsolePage() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label>Method</Label>
-                    <select className="w-full p-2 rounded-lg bg-input border border-border text-foreground">
-                      <option>POST</option>
+                    <select
+                      className="w-full p-2 rounded-lg bg-input border border-border text-foreground"
+                      value={method}
+                      onChange={(event) => setMethod(event.target.value)}
+                    >
                       <option>GET</option>
+                      <option>POST</option>
                     </select>
                   </div>
                   <div className="md:col-span-3 space-y-2">
                     <Label>Endpoint</Label>
-                    <Input defaultValue="/api/v1/licenses/verify" className="bg-input border-border font-mono" />
+                    <Input
+                      value={endpoint}
+                      onChange={(event) => setEndpoint(event.target.value)}
+                      className="bg-input border-border font-mono"
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -174,18 +224,30 @@ export default function ApiConsolePage() {
                   <textarea
                     rows={8}
                     className="w-full p-4 rounded-lg bg-[#0d1117] border border-border font-mono text-sm text-[#c9d1d9] resize-none"
-                    defaultValue={exampleRequest}
+                    value={requestBody}
+                    onChange={(event) => setRequestBody(event.target.value)}
                   />
                 </div>
-                <Button onClick={runTest} className="bg-primary hover:bg-primary/90 text-primary-foreground glow-blue">
-                  <Play className="w-4 h-4 mr-2" />
-                  Run Test
+                {testError && <p className="text-sm text-destructive">{testError}</p>}
+                <Button
+                  onClick={runTest}
+                  disabled={testing}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground glow-blue"
+                >
+                  {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                  {testing ? "Running..." : "Run Test"}
                 </Button>
                 {testResult && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>Response</Label>
-                      <Badge className="bg-success/10 text-success border-success/30">200 OK</Badge>
+                      <Badge className={cn(
+                        testStatus >= 400
+                          ? "bg-destructive/10 text-destructive border-destructive/30"
+                          : "bg-success/10 text-success border-success/30",
+                      )}>
+                        {testStatus || "N/A"}
+                      </Badge>
                     </div>
                     <pre className="p-4 rounded-lg bg-[#0d1117] border border-border overflow-x-auto">
                       <code className="text-sm font-mono text-[#c9d1d9]">{testResult}</code>

@@ -1,9 +1,13 @@
+import { useEffect, useMemo, useState } from "react"
 import { AdminHeader } from "@/components/AdminHeader"
 import { StatsCard } from "@/components/StatsCard"
 import { StatusBadge } from "@/components/StatusBadge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { ErrorState, LoadingState } from "@/components/DataState"
 import { Key, Users, AlertTriangle, Clock, TrendingUp, RefreshCw, Plus, ArrowRight, Activity } from "lucide-react"
+import { customersApi, getApiErrorMessage, licensesApi, productsApi } from "@/lib/api"
+import { getLicenseStatus } from "@/lib/formatters"
 import {
   LineChart,
   Line,
@@ -27,57 +31,104 @@ const renewalData = [
   { month: "Jul", renewals: 72 },
 ]
 
-const licenseDistribution = [
-  { name: "Active", value: 847, color: "#22c55e" },
-  { name: "Expired", value: 124, color: "#ef4444" },
-  { name: "Trial", value: 89, color: "#06b6d4" },
-  { name: "Expiring", value: 56, color: "#f59e0b" },
-]
-
-const recentCustomers = [
-  { name: "Acme Corporation", licenses: 12, status: "valid", lastActivity: "2 hours ago" },
-  { name: "TechStart Inc.", licenses: 5, status: "trial", lastActivity: "5 hours ago" },
-  { name: "GlobalTech Ltd.", licenses: 28, status: "expiring", lastActivity: "1 day ago" },
-  { name: "InnovateCo", licenses: 8, status: "valid", lastActivity: "2 days ago" },
-  { name: "DataFlow Systems", licenses: 15, status: "expired", lastActivity: "3 days ago" },
-]
-
 export default function DashboardPage() {
+  const [customers, setCustomers] = useState([])
+  const [licenses, setLicenses] = useState([])
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetchDashboard = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [customersResponse, licensesResponse, productsResponse] = await Promise.all([
+        customersApi.list(),
+        licensesApi.list(),
+        productsApi.list(),
+      ])
+      setCustomers(customersResponse.data)
+      setLicenses(licensesResponse.data)
+      setProducts(productsResponse.data)
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to load dashboard data"))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchDashboard()
+  }, [])
+
+  const licenseStats = useMemo(() => {
+    return licenses.reduce(
+      (acc, license) => {
+        const status = getLicenseStatus(license)
+        acc[status] = (acc[status] || 0) + 1
+        return acc
+      },
+      { valid: 0, expired: 0, trial: 0, expiring: 0 },
+    )
+  }, [licenses])
+
+  const licenseDistribution = [
+    { name: "Active", value: licenseStats.valid || 0, color: "#22c55e" },
+    { name: "Expired", value: licenseStats.expired || 0, color: "#ef4444" },
+    { name: "Trial", value: licenseStats.trial || 0, color: "#06b6d4" },
+    { name: "Expiring", value: licenseStats.expiring || 0, color: "#f59e0b" },
+  ]
+
+  const recentCustomers = customers.slice(0, 5).map((customer) => ({
+    id: customer.id,
+    name: customer.username,
+    licenses: Number(customer.license_count || 0),
+    status: Number(customer.license_count || 0) > 0 ? "valid" : "trial",
+    lastActivity: "Recently",
+  }))
+
   return (
     <div className="min-h-screen">
       <AdminHeader title="Dashboard" subtitle="Welcome back, Admin" />
 
       <div className="p-6 space-y-6">
+        {loading && <LoadingState message="Loading dashboard data..." />}
+
+        {error && !loading && <ErrorState message={error} onRetry={fetchDashboard} />}
+
+        {!loading && !error && (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard
             title="Active Licenses"
-            value="847"
-            change="+12% from last month"
-            changeType="positive"
+            value={licenseStats.valid || 0}
+            change={`${products.length} product(s)`}
+            changeType="neutral"
             icon={Key}
             iconColor="text-primary"
           />
           <StatsCard
             title="Expired Licenses"
-            value="124"
-            change="-8% from last month"
-            changeType="positive"
+            value={licenseStats.expired || 0}
+            change={`${licenses.length} total licenses`}
+            changeType={(licenseStats.expired || 0) > 0 ? "negative" : "positive"}
             icon={AlertTriangle}
             iconColor="text-destructive"
           />
           <StatsCard
             title="Trial Licenses"
-            value="89"
-            change="+5 new this week"
+            value={licenseStats.trial || 0}
+            change={`${customers.length} customer(s)`}
             changeType="neutral"
             icon={Clock}
             iconColor="text-accent"
           />
           <StatsCard
             title="Renewals Needed"
-            value="56"
+            value={licenseStats.expiring || 0}
             change="Within 30 days"
-            changeType="negative"
+            changeType={(licenseStats.expiring || 0) > 0 ? "negative" : "positive"}
             icon={RefreshCw}
             iconColor="text-warning"
           />
@@ -180,9 +231,9 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {recentCustomers.map((customer, index) => (
+                {recentCustomers.map((customer) => (
                   <div
-                    key={index}
+                    key={customer.id}
                     className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-3">
@@ -252,19 +303,21 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 rounded-lg bg-warning/10 border border-warning/30">
                 <p className="font-medium text-warning">Expiring Soon</p>
-                <p className="text-sm text-muted-foreground mt-1">15 licenses expiring within 7 days</p>
+                <p className="text-sm text-muted-foreground mt-1">{licenseStats.expiring || 0} licenses expiring within 30 days</p>
               </div>
               <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/30">
-                <p className="font-medium text-destructive">Failed Activations</p>
-                <p className="text-sm text-muted-foreground mt-1">3 activation attempts failed today</p>
+                <p className="font-medium text-destructive">Expired Licenses</p>
+                <p className="text-sm text-muted-foreground mt-1">{licenseStats.expired || 0} licenses are expired</p>
               </div>
               <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
-                <p className="font-medium text-primary">New Registrations</p>
-                <p className="text-sm text-muted-foreground mt-1">8 new customers this week</p>
+                <p className="font-medium text-primary">Customers</p>
+                <p className="text-sm text-muted-foreground mt-1">{customers.length} customers registered</p>
               </div>
             </div>
           </CardContent>
         </Card>
+        </>
+        )}
       </div>
     </div>
   )

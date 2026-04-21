@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
+  baseURL: import.meta.env.VITE_API_URL?.trim() || "http://localhost:8080/api",
 });
 
 // Add token to every request
@@ -17,7 +17,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthRequest = ["/auth/login", "/auth/register", "/customers/register"].some((path) =>
+      error.config?.url?.includes(path),
+    );
+
+    if (error.response?.status === 401 && !isAuthRequest && localStorage.getItem("token")) {
       localStorage.removeItem("token");
       window.location.href = "/";
     }

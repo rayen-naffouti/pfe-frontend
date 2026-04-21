@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Lock, Mail, Shield, User } from "lucide-react"
+import { authApi, getApiErrorMessage } from "@/lib/api"
 
 export default function RegisterPage() {
   const navigate = useNavigate()
@@ -29,28 +30,16 @@ export default function RegisterPage() {
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/customers/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username,
-          email,
-          password,
-        }),
+      const { data } = await authApi.register({
+        username,
+        email,
+        password,
       })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.message || "Registration failed")
-      }
 
       localStorage.setItem("token", data.token)
       navigate("/admin/dashboard")
     } catch (err) {
-      setError(err.message)
+      setError(getApiErrorMessage(err, "Registration failed"))
     } finally {
       setLoading(false)
     }

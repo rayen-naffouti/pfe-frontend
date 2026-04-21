@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Lock, Mail, Shield, EyeOff } from "lucide-react"
+import { authApi, getApiErrorMessage } from "@/lib/api"
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -22,24 +23,11 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          code: code2fa,
-        }),
+      const { data } = await authApi.login({
+        email,
+        password,
+        code: code2fa,
       })
-
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.message || "Login failed")
-      }
 
       // Save token
       localStorage.setItem("token", data.token)
@@ -47,7 +35,7 @@ export default function LoginPage() {
       // Redirect
       navigate("/admin/dashboard")
     } catch (err) {
-      setError(err.message)
+      setError(getApiErrorMessage(err, "Login failed"))
     } finally {
       setLoading(false)
     }

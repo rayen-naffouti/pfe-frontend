@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { Link, useParams } from "react-router-dom"
 import { AdminHeader } from "@/components/AdminHeader"
 import { StatusBadge } from "@/components/StatusBadge"
 import { Button } from "@/components/ui/button"
@@ -8,24 +9,85 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Key, CreditCard, Bell, Mail, Phone, Building, MapPin, ArrowLeft, Edit, Plus } from "lucide-react"
-
-const customerLicenses = [
-  { id: "LIC-2024-001", product: "Enterprise Suite", type: "Perpetual", status: "valid", expiration: "2025-12-31" },
-  { id: "LIC-2024-015", product: "Professional", type: "Annual", status: "valid", expiration: "2024-08-15" },
-  { id: "LIC-2024-023", product: "Standard", type: "Subscription", status: "expiring", expiration: "2024-01-25" },
-]
-
-const billingHistory = [
-  { date: "2024-01-15", description: "License Renewal - Enterprise Suite", amount: "$2,499.00", status: "Paid" },
-  { date: "2023-12-01", description: "License Purchase - Professional", amount: "$999.00", status: "Paid" },
-  { date: "2023-06-15", description: "License Upgrade", amount: "$500.00", status: "Paid" },
-]
+import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
+import { Key, CreditCard, Bell, Mail, Building, MapPin, ArrowLeft, Edit, Plus } from "lucide-react"
+import { customersApi, getApiErrorMessage } from "@/lib/api"
+import { formatCurrency, formatDate, getLicenseStatus } from "@/lib/formatters"
 
 export default function CustomerProfilePage() {
+  const { id } = useParams()
+  const [customer, setCustomer] = useState(null)
+  const [licenses, setLicenses] = useState([])
+  const [payments, setPayments] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetchCustomerProfile = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [customerResponse, licensesResponse, paymentsResponse] = await Promise.all([
+        customersApi.get(id),
+        customersApi.licenses(id),
+        customersApi.payments(id),
+      ])
+      setCustomer(customerResponse.data)
+      setLicenses(licensesResponse.data)
+      setPayments(paymentsResponse.data)
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to load customer profile"))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCustomerProfile()
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <AdminHeader title="Customer Profile" subtitle={`Customer #${id}`} />
+        <div className="p-6">
+          <LoadingState message="Loading customer profile..." />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen">
+        <AdminHeader title="Customer Profile" subtitle={`Customer #${id}`} />
+        <div className="p-6 space-y-6">
+          <Button variant="ghost" asChild>
+            <Link to="/admin/customers">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Customers
+            </Link>
+          </Button>
+          <ErrorState message={error} onRetry={fetchCustomerProfile} />
+        </div>
+      </div>
+    )
+  }
+
+  if (!customer) {
+    return (
+      <div className="min-h-screen">
+        <AdminHeader title="Customer Profile" subtitle={`Customer #${id}`} />
+        <div className="p-6">
+          <EmptyState message="Customer not found" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen">
-      <AdminHeader title="Customer Profile" subtitle="Acme Corporation" />
+      <AdminHeader title="Customer Profile" subtitle={customer.username} />
 
       <div className="p-6 space-y-6">
         <Button variant="ghost" asChild className="mb-4">
@@ -40,28 +102,24 @@ export default function CustomerProfilePage() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div className="flex items-center gap-4">
                 <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center text-primary text-3xl font-bold">
-                  A
+                  {customer.username?.charAt(0)?.toUpperCase()}
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground">Acme Corporation</h2>
+                  <h2 className="text-2xl font-bold text-foreground">{customer.username}</h2>
                   <div className="flex items-center gap-4 mt-2 text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Mail className="w-4 h-4" />
-                      admin@acme.com
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Phone className="w-4 h-4" />
-                      +1 (555) 123-4567
+                      {customer.email}
                     </span>
                   </div>
                   <div className="flex items-center gap-4 mt-1 text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Building className="w-4 h-4" />
-                      Technology
+                      {customer.role || "customer"}
                     </span>
                     <span className="flex items-center gap-1">
                       <MapPin className="w-4 h-4" />
-                      San Francisco, CA
+                      Joined {formatDate(customer.created_at)}
                     </span>
                   </div>
                 </div>
@@ -71,9 +129,11 @@ export default function CustomerProfilePage() {
                   <Edit className="w-4 h-4 mr-2" />
                   Edit Profile
                 </Button>
-                <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add License
+                <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                  <Link to="/admin/licenses/new">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add License
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -104,7 +164,8 @@ export default function CustomerProfilePage() {
 
           <TabsContent value="licenses">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              {customerLicenses.map((license) => (
+              {licenses.length === 0 && <EmptyState message="No licenses found for this customer" />}
+              {licenses.map((license) => (
                 <Card
                   key={license.id}
                   className="glass border-border hover:glow-blue transition-all duration-300 cursor-pointer"
@@ -112,19 +173,19 @@ export default function CustomerProfilePage() {
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <p className="font-medium text-foreground">{license.product}</p>
-                        <code className="text-xs text-muted-foreground">{license.id}</code>
+                        <p className="font-medium text-foreground">{license.product_name || "N/A"}</p>
+                        <code className="text-xs text-muted-foreground break-all">{license.license_key || `#${license.id}`}</code>
                       </div>
-                      <StatusBadge status={license.status} />
+                      <StatusBadge status={getLicenseStatus(license)} />
                     </div>
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Type</span>
-                        <span className="text-foreground">{license.type}</span>
+                        <span className="text-muted-foreground">Status</span>
+                        <span className="text-foreground capitalize">{license.status || "valid"}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Expires</span>
-                        <span className="text-foreground">{license.expiration}</span>
+                        <span className="text-foreground">{formatDate(license.expiration_at)}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -148,13 +209,22 @@ export default function CustomerProfilePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {billingHistory.map((item, index) => (
-                    <TableRow key={index} className="border-border hover:bg-secondary/30">
-                      <TableCell className="text-muted-foreground">{item.date}</TableCell>
-                      <TableCell className="text-foreground">{item.description}</TableCell>
-                      <TableCell className="text-foreground font-medium">{item.amount}</TableCell>
+                  {payments.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        No payments found for this customer
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {payments.map((item) => (
+                    <TableRow key={item.id} className="border-border hover:bg-secondary/30">
+                      <TableCell className="text-muted-foreground">{formatDate(item.created_at)}</TableCell>
+                      <TableCell className="text-foreground">Payment for license #{item.license_id}</TableCell>
+                      <TableCell className="text-foreground font-medium">
+                        {formatCurrency(item.amount, item.currency || "USD")}
+                      </TableCell>
                       <TableCell>
-                        <Badge className="bg-success/10 text-success border-success/30">{item.status}</Badge>
+                        <Badge className="bg-success/10 text-success border-success/30">{item.status || "paid"}</Badge>
                       </TableCell>
                     </TableRow>
                   ))}

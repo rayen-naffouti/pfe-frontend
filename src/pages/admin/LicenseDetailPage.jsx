@@ -1,12 +1,15 @@
 "use client"
 
-import { useState } from "react"
-import { Link } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { Link, useParams } from "react-router-dom"
 import { AdminHeader } from "@/components/AdminHeader"
 import { StatusBadge } from "@/components/StatusBadge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
+import { getApiErrorMessage, licensesApi } from "@/lib/api"
+import { formatDate, formatDateTime, getLicenseStatus } from "@/lib/formatters"
 import {
   Key,
   User,
@@ -24,30 +27,90 @@ import {
   AlertTriangle,
 } from "lucide-react"
 
-const activityLog = [
-  { date: "2024-01-15 14:32", action: "License Activated", device: "MacBook Pro M2", ip: "192.168.1.100" },
-  { date: "2024-01-14 09:15", action: "License Verified", device: "Windows Desktop", ip: "10.0.0.55" },
-  { date: "2024-01-10 16:45", action: "License Created", device: "Admin Portal", ip: "Admin" },
-]
-
-const activationHistory = [
-  { device: "MacBook Pro M2", os: "macOS 14.2", activated: "2024-01-15", status: "Active" },
-  { device: "Windows Desktop", os: "Windows 11", activated: "2024-01-14", status: "Active" },
-  { device: "Linux Server", os: "Ubuntu 22.04", activated: "2024-01-12", status: "Deactivated" },
-]
-
 export default function LicenseDetailPage() {
+  const { id } = useParams()
+  const [license, setLicense] = useState(null)
+  const [history, setHistory] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText("LIC-2024-001-ACME-XXXX-YYYY-ZZZZ")
+  const fetchLicense = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [licenseResponse, historyResponse] = await Promise.all([
+        licensesApi.get(id),
+        licensesApi.history(id),
+      ])
+      setLicense(licenseResponse.data)
+      setHistory(historyResponse.data)
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to load license details"))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchLicense()
+  }, [id])
+
+  const handleCopy = async () => {
+    if (!license?.license_key) {
+      return
+    }
+
+    await navigator.clipboard.writeText(license.license_key)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <AdminHeader title="License Details" subtitle={`License #${id}`} />
+        <div className="p-6">
+          <LoadingState message="Loading license details..." />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen">
+        <AdminHeader title="License Details" subtitle={`License #${id}`} />
+        <div className="p-6 space-y-6">
+          <Button variant="ghost" asChild>
+            <Link to="/admin/licenses">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Licenses
+            </Link>
+          </Button>
+          <ErrorState message={error} onRetry={fetchLicense} />
+        </div>
+      </div>
+    )
+  }
+
+  if (!license) {
+    return (
+      <div className="min-h-screen">
+        <AdminHeader title="License Details" subtitle={`License #${id}`} />
+        <div className="p-6">
+          <EmptyState message="License not found" />
+        </div>
+      </div>
+    )
+  }
+
+  const status = getLicenseStatus(license)
+
   return (
     <div className="min-h-screen">
-      <AdminHeader title="License Details" subtitle="LIC-2024-001" />
+      <AdminHeader title="License Details" subtitle={license.license_key || `License #${license.id}`} />
 
       <div className="p-6 space-y-6">
         <Button variant="ghost" asChild className="mb-4">
@@ -66,10 +129,10 @@ export default function LicenseDetailPage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-bold text-foreground">Acme Corporation</h2>
-                    <StatusBadge status="valid" />
+                    <h2 className="text-xl font-bold text-foreground">{license.customer_username || "N/A"}</h2>
+                    <StatusBadge status={status} />
                   </div>
-                  <p className="text-muted-foreground">Enterprise Suite - Perpetual License</p>
+                  <p className="text-muted-foreground">{license.product_name || "N/A"}</p>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -97,7 +160,7 @@ export default function LicenseDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-3 p-4 rounded-lg bg-secondary/30 border border-border">
-                  <code className="flex-1 text-lg font-mono text-primary">LIC-2024-001-ACME-XXXX-YYYY-ZZZZ</code>
+                  <code className="flex-1 text-lg font-mono text-primary break-all">{license.license_key}</code>
                   <Button variant="ghost" size="icon" onClick={handleCopy}>
                     {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
                   </Button>
@@ -114,7 +177,7 @@ export default function LicenseDetailPage() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Customer</p>
-                      <p className="font-medium text-foreground">Acme Corporation</p>
+                      <p className="font-medium text-foreground">{license.customer_username || "N/A"}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -127,7 +190,7 @@ export default function LicenseDetailPage() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Product</p>
-                      <p className="font-medium text-foreground">Enterprise Suite</p>
+                      <p className="font-medium text-foreground">{license.product_name || "N/A"}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -140,7 +203,7 @@ export default function LicenseDetailPage() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Expiration</p>
-                      <p className="font-medium text-foreground">December 31, 2025</p>
+                      <p className="font-medium text-foreground">{formatDate(license.expiration_at)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -152,8 +215,8 @@ export default function LicenseDetailPage() {
                       <Monitor className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Activations</p>
-                      <p className="font-medium text-foreground">5 / 10 devices</p>
+                      <p className="text-sm text-muted-foreground">Created</p>
+                      <p className="font-medium text-foreground">{formatDate(license.license_created_at || license.created_at)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -171,17 +234,21 @@ export default function LicenseDetailPage() {
                 <div className="relative">
                   <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
                   <div className="space-y-6">
-                    {activityLog.map((log, index) => (
-                      <div key={index} className="relative pl-10">
+                    {history.length === 0 && (
+                      <p className="text-sm text-muted-foreground pl-10">No history entries yet.</p>
+                    )}
+                    {history.map((log) => (
+                      <div key={log.id} className="relative pl-10">
                         <div className="absolute left-2.5 w-3 h-3 rounded-full bg-primary ring-4 ring-background" />
                         <div className="p-4 rounded-lg bg-secondary/30 border border-border">
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium text-foreground">{log.action}</span>
-                            <span className="text-xs text-muted-foreground">{log.date}</span>
+                            <span className="text-xs text-muted-foreground">{formatDateTime(log.created_at)}</span>
                           </div>
                           <div className="flex gap-4 text-sm text-muted-foreground">
-                            <span>Device: {log.device}</span>
-                            <span>IP: {log.ip}</span>
+                            {log.old_status && <span>From: {log.old_status}</span>}
+                            {log.new_status && <span>To: {log.new_status}</span>}
+                            {log.note && <span>{log.note}</span>}
                           </div>
                         </div>
                       </div>
@@ -201,25 +268,9 @@ export default function LicenseDetailPage() {
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="space-y-3 pt-2">
-                    {activationHistory.map((device, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border"
-                      >
-                        <div>
-                          <p className="font-medium text-foreground">{device.device}</p>
-                          <p className="text-sm text-muted-foreground">{device.os}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">{device.activated}</p>
-                          <span
-                            className={`text-xs ${device.status === "Active" ? "text-success" : "text-muted-foreground"}`}
-                          >
-                            {device.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                    <div className="p-3 rounded-lg bg-secondary/30 border border-border text-sm text-muted-foreground">
+                      Activation devices are not exposed by the current backend API.
+                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -232,11 +283,13 @@ export default function LicenseDetailPage() {
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="p-4 rounded-lg bg-secondary/30 border border-border font-mono text-sm text-muted-foreground">
-                    <p>[2024-01-15 14:32:15] License verified successfully</p>
-                    <p>[2024-01-15 14:32:14] Signature validation: PASSED</p>
-                    <p>[2024-01-15 14:32:13] Hardware ID check: PASSED</p>
-                    <p>[2024-01-15 14:32:12] Expiration check: VALID</p>
-                    <p>[2024-01-15 14:32:11] Verification request received</p>
+                    {history.length === 0 && <p>No verification or history logs available.</p>}
+                    {history.map((log) => (
+                      <p key={log.id}>
+                        [{formatDateTime(log.created_at)}] {log.action}
+                        {log.note ? ` - ${log.note}` : ""}
+                      </p>
+                    ))}
                   </div>
                 </AccordionContent>
               </AccordionItem>

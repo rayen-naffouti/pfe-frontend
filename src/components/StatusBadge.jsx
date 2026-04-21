@@ -9,7 +9,8 @@ const statusConfig = {
 }
 
 export function StatusBadge({ status, className }) {
-  const config = statusConfig[status]
+  const normalizedStatus = statusConfig[status] ? status : "disabled"
+  const config = statusConfig[normalizedStatus]
 
   return (
     <span
@@ -22,11 +23,11 @@ export function StatusBadge({ status, className }) {
       <span
         className={cn(
           "w-1.5 h-1.5 rounded-full mr-1.5",
-          status === "valid" && "bg-success",
-          status === "expired" && "bg-destructive",
-          status === "expiring" && "bg-warning",
-          status === "trial" && "bg-accent",
-          status === "disabled" && "bg-muted-foreground",
+          normalizedStatus === "valid" && "bg-success",
+          normalizedStatus === "expired" && "bg-destructive",
+          normalizedStatus === "expiring" && "bg-warning",
+          normalizedStatus === "trial" && "bg-accent",
+          normalizedStatus === "disabled" && "bg-muted-foreground",
         )}
       />
       {config.label}
