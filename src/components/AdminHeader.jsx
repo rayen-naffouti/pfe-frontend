@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { ThemeToggle } from "@/components/ThemeToggle"
 import { authApi } from "@/lib/api"
 
 export function AdminHeader({ title, subtitle }) {
@@ -55,6 +56,8 @@ export function AdminHeader({ title, subtitle }) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input placeholder="Search..." className="w-64 pl-9 bg-input border-border focus:ring-primary" />
           </div>
+
+          <ThemeToggle />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

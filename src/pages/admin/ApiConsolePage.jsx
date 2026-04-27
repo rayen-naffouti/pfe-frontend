@@ -168,8 +168,8 @@ export default function ApiConsolePage() {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <pre className="p-4 rounded-lg bg-[#0d1117] border border-border overflow-x-auto">
-                    <code className="text-sm font-mono text-[#c9d1d9]">{exampleRequest}</code>
+                  <pre className="p-4 rounded-lg code-panel border border-border overflow-x-auto">
+                    <code className="text-sm font-mono">{exampleRequest}</code>
                   </pre>
                 </CardContent>
               </Card>
@@ -181,8 +181,8 @@ export default function ApiConsolePage() {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <pre className="p-4 rounded-lg bg-[#0d1117] border border-border overflow-x-auto">
-                    <code className="text-sm font-mono text-[#c9d1d9]">{exampleResponse}</code>
+                  <pre className="p-4 rounded-lg code-panel border border-border overflow-x-auto">
+                    <code className="text-sm font-mono">{exampleResponse}</code>
                   </pre>
                 </CardContent>
               </Card>
@@ -223,7 +223,7 @@ export default function ApiConsolePage() {
                   <Label>Request Body</Label>
                   <textarea
                     rows={8}
-                    className="w-full p-4 rounded-lg bg-[#0d1117] border border-border font-mono text-sm text-[#c9d1d9] resize-none"
+                    className="w-full p-4 rounded-lg code-panel border border-border font-mono text-sm resize-none"
                     value={requestBody}
                     onChange={(event) => setRequestBody(event.target.value)}
                   />
@@ -249,8 +249,8 @@ export default function ApiConsolePage() {
                         {testStatus || "N/A"}
                       </Badge>
                     </div>
-                    <pre className="p-4 rounded-lg bg-[#0d1117] border border-border overflow-x-auto">
-                      <code className="text-sm font-mono text-[#c9d1d9]">{testResult}</code>
+                    <pre className="p-4 rounded-lg code-panel border border-border overflow-x-auto">
+                      <code className="text-sm font-mono">{testResult}</code>
                     </pre>
                   </div>
                 )}
@@ -313,8 +313,8 @@ export default function ApiConsolePage() {
                   <p className="text-sm text-muted-foreground mb-4">
                     Use this public key to verify license signatures in your application.
                   </p>
-                  <pre className="p-4 rounded-lg bg-[#0d1117] border border-border overflow-x-auto">
-                    <code className="text-xs font-mono text-[#c9d1d9]">{rsaPublicKey}</code>
+                  <pre className="p-4 rounded-lg code-panel border border-border overflow-x-auto">
+                    <code className="text-xs font-mono">{rsaPublicKey}</code>
                   </pre>
                   <Button
                     variant="outline"

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import { AdminHeader } from "@/components/AdminHeader"
 import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
 import { Button } from "@/components/ui/button"
@@ -10,13 +11,15 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Search, Plus, Package, Copy, Shield, Loader2 } from "lucide-react"
+import { Search, Plus, Package, Copy, Shield, Loader2, Eye } from "lucide-react"
 import { getApiErrorMessage, productsApi } from "@/lib/api"
 import { formatDate, slugify } from "@/lib/formatters"
 
 const initialProductForm = {
   name: "",
   slug: "",
+  tenant_id: "",
+  host_base_url: "",
   description: "",
 }
 
@@ -55,6 +58,8 @@ export default function ProductsPage() {
       return (
         product.name?.toLowerCase().includes(query) ||
         product.slug?.toLowerCase().includes(query) ||
+        product.tenant_id?.toLowerCase().includes(query) ||
+        product.host_base_url?.toLowerCase().includes(query) ||
         product.description?.toLowerCase().includes(query)
       )
     })
@@ -71,8 +76,8 @@ export default function ProductsPage() {
   const handleAddProduct = async () => {
     setCreateError(null)
 
-    if (!newProduct.name || !newProduct.slug) {
-      setCreateError("Product name and slug are required")
+    if (!newProduct.name || !newProduct.slug || !newProduct.tenant_id || !newProduct.host_base_url) {
+      setCreateError("Product name, slug, tenant ID and host base URL are required")
       return
     }
 
@@ -199,6 +204,35 @@ export default function ProductsPage() {
                       />
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="tenant_id" className="text-foreground">
+                          Tenant ID
+                        </Label>
+                        <Input
+                          id="tenant_id"
+                          placeholder="tenant_001"
+                          className="bg-input border-border"
+                          value={newProduct.tenant_id}
+                          onChange={(event) => setNewProduct({ ...newProduct, tenant_id: event.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="host_base_url" className="text-foreground">
+                          Host Base URL
+                        </Label>
+                        <Input
+                          id="host_base_url"
+                          type="url"
+                          placeholder="https://tenant.example.com"
+                          className="bg-input border-border"
+                          value={newProduct.host_base_url}
+                          onChange={(event) => setNewProduct({ ...newProduct, host_base_url: event.target.value })}
+                        />
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="description" className="text-foreground">
                         Description
@@ -216,7 +250,13 @@ export default function ProductsPage() {
                     <Button
                       className="w-full bg-primary hover:bg-primary/90 text-primary-foreground glow-blue"
                       onClick={handleAddProduct}
-                      disabled={creating || !newProduct.name || !newProduct.slug}
+                      disabled={
+                        creating ||
+                        !newProduct.name ||
+                        !newProduct.slug ||
+                        !newProduct.tenant_id ||
+                        !newProduct.host_base_url
+                      }
                     >
                       {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
                       {creating ? "Creating..." : "Create Product"}
@@ -242,8 +282,11 @@ export default function ProductsPage() {
                   <TableHead className="text-muted-foreground">Product ID</TableHead>
                   <TableHead className="text-muted-foreground">Name</TableHead>
                   <TableHead className="text-muted-foreground">Slug</TableHead>
+                  <TableHead className="text-muted-foreground">Tenant ID</TableHead>
+                  <TableHead className="text-muted-foreground">Host Base URL</TableHead>
                   <TableHead className="text-muted-foreground">Licenses</TableHead>
                   <TableHead className="text-muted-foreground">Created</TableHead>
+                  <TableHead className="text-muted-foreground w-12">Details</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -254,17 +297,35 @@ export default function ProductsPage() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium text-foreground">{product.name}</p>
+                        <Link
+                          to={`/admin/products/${product.id}`}
+                          className="font-medium text-foreground hover:text-primary transition-colors"
+                        >
+                          {product.name}
+                        </Link>
                         <p className="text-xs text-muted-foreground truncate max-w-xs">{product.description || "No description"}</p>
                       </div>
                     </TableCell>
                     <TableCell>
                       <code className="text-sm text-muted-foreground">{product.slug}</code>
                     </TableCell>
+                    <TableCell>
+                      <code className="text-sm text-muted-foreground">{product.tenant_id || "N/A"}</code>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground max-w-56 truncate">
+                      {product.host_base_url || "N/A"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {Number(product.license_count || 0).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{formatDate(product.created_at)}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" asChild className="h-8 w-8">
+                        <Link to={`/admin/products/${product.id}`}>
+                          <Eye className="w-4 h-4" />
+                        </Link>
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

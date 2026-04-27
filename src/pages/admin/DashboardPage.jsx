@@ -148,15 +148,15 @@ export default function DashboardPage() {
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={renewalData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.25 0.03 260)" />
-                  <XAxis dataKey="month" stroke="oklch(0.6 0.02 260)" fontSize={12} />
-                  <YAxis stroke="oklch(0.6 0.02 260)" fontSize={12} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                  <XAxis dataKey="month" stroke="var(--chart-axis)" fontSize={12} />
+                  <YAxis stroke="var(--chart-axis)" fontSize={12} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "oklch(0.16 0.025 260)",
-                      border: "1px solid oklch(0.25 0.03 260)",
+                      backgroundColor: "var(--card)",
+                      border: "1px solid var(--border)",
                       borderRadius: "8px",
-                      color: "oklch(0.95 0.01 260)",
+                      color: "var(--foreground)",
                     }}
                   />
                   <Line
@@ -197,10 +197,10 @@ export default function DashboardPage() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "oklch(0.16 0.025 260)",
-                      border: "1px solid oklch(0.25 0.03 260)",
+                      backgroundColor: "var(--card)",
+                      border: "1px solid var(--border)",
                       borderRadius: "8px",
-                      color: "oklch(0.95 0.01 260)",
+                      color: "var(--foreground)",
                     }}
                   />
                 </PieChart>

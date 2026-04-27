@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { MinotaurLogo } from "@/components/MinotaurLogo"
 import { ParticlesBackground } from "@/components/ParticlesBackground"
+import { ThemeToggle } from "@/components/ThemeToggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -48,7 +49,8 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
       <ParticlesBackground />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_oklch(0.2_0.05_250)_0%,_oklch(0.13_0.02_260)_70%)]" />
+      <div className="absolute inset-0 auth-radial-bg" />
+      <ThemeToggle className="absolute right-6 top-6 z-20 glass-strong" />
 
       <div className="relative z-10 w-full max-w-md mx-4">
         <div className="glass-strong rounded-2xl p-8 neon-border">

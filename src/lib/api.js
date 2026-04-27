@@ -28,6 +28,7 @@ export const licensesApi = {
   list: () => api.get("/licenses"),
   get: (id) => api.get(`/licenses/${id}`),
   create: (payload) => api.post("/licenses", payload),
+  checkout: (payload) => api.post("/licenses/checkout", payload),
   history: (licenseId) => api.get(`/licenses/${licenseId}/history`),
 }
 

@@ -16,6 +16,7 @@ import RenewalPage from "@/pages/portal/RenewalPage"
 import ProtectedRoute from "../components/ProtectedRout"
 import RegisterPage from "../pages/RegisterPage"
 import ProductsPage from "../pages/admin/ProductsPage"
+import ProductDetailPage from "../pages/admin/ProductDetailPage"
 
 export default function AppRoutes() {
   return (
@@ -32,6 +33,7 @@ export default function AppRoutes() {
           <Route path="customers" element={<CustomersPage />} />
           <Route path="customers/:id" element={<CustomerProfilePage />} />
           <Route path="products" element={<ProductsPage />} />
+          <Route path="products/:id" element={<ProductDetailPage />} />
           <Route path="automation" element={<AutomationPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="api-console" element={<ApiConsolePage />} />
