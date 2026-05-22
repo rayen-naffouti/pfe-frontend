@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Lock, Mail, Shield, EyeOff } from "lucide-react"
 import { authApi, getApiErrorMessage } from "@/lib/api"
+import { getDefaultRouteForRole, setAuthSession } from "@/lib/auth"
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -30,11 +31,8 @@ export default function LoginPage() {
         code: code2fa,
       })
 
-      // Save token
-      localStorage.setItem("token", data.token)
-
-      // Redirect
-      navigate("/admin/dashboard")
+      const role = setAuthSession({ token: data.token, account: data.customer || data.user })
+      navigate(getDefaultRouteForRole(role))
     } catch (err) {
       setError(getApiErrorMessage(err, "Login failed"))
     } finally {
@@ -155,8 +153,8 @@ export default function LoginPage() {
         </div>
 
         <div className="mt-6 text-center">
-          <Link to="/portal" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-            Customer Portal Access →
+          <Link to="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+            Back to Avaxia Dev
           </Link>
         </div>
       </div>

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
 import { getApiErrorMessage, licensesApi } from "@/lib/api"
-import { formatDate, formatDateTime, getLicenseStatus } from "@/lib/formatters"
+import { formatCurrency, formatDate, formatDateTime, getLicenseStatus } from "@/lib/formatters"
 import {
   Key,
   User,
@@ -25,7 +25,43 @@ import {
   ArrowLeft,
   Activity,
   AlertTriangle,
+  ListChecks,
+  Server,
 } from "lucide-react"
+
+const decodeLicenseKey = (licenseKey) => {
+  if (!licenseKey || !licenseKey.startsWith("LIC-")) {
+    return { payload: null, error: "Unsupported license key format" }
+  }
+
+  const [payloadBase64] = licenseKey.slice(4).split(".")
+
+  if (!payloadBase64) {
+    return { payload: null, error: "Missing token payload" }
+  }
+
+  try {
+    const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/")
+    const padding = "=".repeat((4 - (normalized.length % 4)) % 4)
+    const binary = globalThis.atob(`${normalized}${padding}`)
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+    const payloadJson = new TextDecoder().decode(bytes)
+
+    return { payload: JSON.parse(payloadJson), error: null }
+  } catch {
+    return { payload: null, error: "Unable to decode token payload" }
+  }
+}
+
+const formatNumber = (value) => {
+  const numericValue = Number(value)
+
+  if (Number.isNaN(numericValue)) {
+    return "N/A"
+  }
+
+  return numericValue.toLocaleString()
+}
 
 export default function LicenseDetailPage() {
   const { id } = useParams()
@@ -107,6 +143,10 @@ export default function LicenseDetailPage() {
   }
 
   const status = getLicenseStatus(license)
+  const decodedLicense = decodeLicenseKey(license.license_key)
+  const tokenPayload = decodedLicense.payload
+  const customPlan = tokenPayload?.customPlan || tokenPayload?.custom_plan || null
+  const customPlanCurrency = customPlan?.pricing?.currency || "USD"
 
   return (
     <div className="min-h-screen">
@@ -165,6 +205,135 @@ export default function LicenseDetailPage() {
                     {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="glass border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  Decoded Token Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {decodedLicense.error ? (
+                  <div className="p-3 rounded-lg bg-secondary/30 border border-border text-sm text-muted-foreground">
+                    {decodedLicense.error}
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <p className="text-xs text-muted-foreground">Token License ID</p>
+                        <p className="mt-1 font-medium text-foreground">{tokenPayload?.id || "N/A"}</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <p className="text-xs text-muted-foreground">Token Expiration</p>
+                        <p className="mt-1 font-medium text-foreground">
+                          {tokenPayload?.exp ? formatDate(tokenPayload.exp * 1000) : "N/A"}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <p className="text-xs text-muted-foreground">Embedded Plan</p>
+                        <p className="mt-1 font-medium text-foreground">{customPlan?.planName || "Standard token"}</p>
+                      </div>
+                    </div>
+
+                    {customPlan ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-lg border border-border bg-card/50 p-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Duration</p>
+                            <p className="mt-1 text-sm font-medium text-foreground">
+                              {customPlan.duration?.label || "N/A"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Total Price</p>
+                            <p className="mt-1 text-sm font-medium text-primary">
+                              {formatCurrency(customPlan.pricing?.totalPrice, customPlanCurrency)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-border bg-secondary/20 p-4">
+                          <div className="mb-3 flex items-center gap-2">
+                            <ListChecks className="h-4 w-4 text-primary" />
+                            <h3 className="font-semibold text-foreground">Selected Modules</h3>
+                          </div>
+                          <div className="space-y-4">
+                            {(customPlan.modules || []).map((module) => (
+                              <div key={module.id} className="rounded-lg border border-border bg-background/30 p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="font-medium text-foreground">{module.name}</p>
+                                    <p className="text-xs text-muted-foreground">{module.category}</p>
+                                  </div>
+                                  <span className="text-sm font-medium text-primary">
+                                    {formatCurrency(module.basePrice, customPlanCurrency)}
+                                  </span>
+                                </div>
+                                {module.submodules?.length > 0 && (
+                                  <div className="mt-3 space-y-2 border-t border-border pt-3">
+                                    {module.submodules.map((subModule) => (
+                                      <div key={subModule.id} className="flex items-start justify-between gap-3 text-sm">
+                                        <div>
+                                          <p className="text-foreground">{subModule.name}</p>
+                                          <p className="text-xs text-muted-foreground">{subModule.description}</p>
+                                        </div>
+                                        <span className="shrink-0 text-primary">
+                                          {formatCurrency(subModule.price, customPlanCurrency)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-border bg-secondary/20 p-4">
+                          <div className="mb-3 flex items-center gap-2">
+                            <Server className="h-4 w-4 text-primary" />
+                            <h3 className="font-semibold text-foreground">Selected Infrastructure</h3>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Requests</p>
+                              <p className="mt-1 text-foreground">
+                                {formatNumber(customPlan.infrastructure?.monthlyRequests)}/month
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Storage</p>
+                              <p className="mt-1 text-foreground">{formatNumber(customPlan.infrastructure?.storageGb)} GB</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Seats</p>
+                              <p className="mt-1 text-foreground">{formatNumber(customPlan.infrastructure?.teamSeats)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Environments</p>
+                              <p className="mt-1 text-foreground">{formatNumber(customPlan.infrastructure?.environments)}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-border bg-background/40 p-4">
+                          <p className="mb-2 text-xs text-muted-foreground">Decoded custom plan object</p>
+                          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-foreground">
+                            {JSON.stringify(customPlan, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-lg bg-secondary/30 border border-border text-sm text-muted-foreground">
+                        No custom plan fields are embedded in this license token.
+                      </div>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
 

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Slider } from "@/components/ui/slider"
 import { ErrorState, LoadingState } from "@/components/DataState"
 import { cn } from "@/lib/utils"
@@ -20,9 +21,13 @@ import {
   Bot,
   Check,
   CreditCard,
+  Eye,
   Gauge,
   Globe2,
+  ImageIcon,
+  Info,
   Layers,
+  ListChecks,
   Loader2,
   Package,
   Server,
@@ -31,6 +36,9 @@ import {
 } from "lucide-react"
 import { customersApi, getApiErrorMessage, licensesApi, productsApi } from "@/lib/api"
 import { formatDate, getLicenseStatus } from "@/lib/formatters"
+import apiShapeImage from "./images/apiShape.png"
+import dataShapeImage from "./images/dataShape.png"
+import vectorDbShapeImage from "./images/vectorDbShape.png"
 
 const plans = [
   {
@@ -149,6 +157,456 @@ const durations = [
   { id: "3y", label: "3 Years", multiplier: 2.5, discount: "17% off" },
 ]
 
+const submoduleDetails = {
+  "data-shapes": {
+    useCase: "For teams that need dependable data mapping between apps, databases and operational tools.",
+    capabilities: ["Visual field mapping and transform rules", "Schema validation before a flow runs", "Reusable templates for repeat integrations"],
+    outcomes: ["Cleaner payloads before production", "Less manual correction work for support teams"],
+    screenshots: [
+      { title: "Schema mapper", caption: "Match source fields to target fields with validation warnings.", src: dataShapeImage },
+      { title: "Validation report", caption: "Review sample records, rejected values and accepted transforms." },
+    ],
+  },
+  "ai-shapes": {
+    useCase: "For workflows that need AI decisions, classification, summarization or extraction inside a process.",
+    capabilities: ["Prompt blocks with input and output controls", "Classification and extraction steps", "Human review routing for sensitive results"],
+    outcomes: ["Faster document and ticket handling", "Consistent AI behavior across repeat workflows"],
+    screenshots: [
+      { title: "AI step builder", caption: "Configure prompts, inputs, expected outputs and review paths." },
+      { title: "Result inspector", caption: "Inspect confidence, source data and final AI output." },
+    ],
+  },
+  "boomi-shapes": {
+    useCase: "For teams migrating or mirroring Boomi-style process patterns in a licensed workflow setup.",
+    capabilities: ["Boomi-compatible process blocks", "Connector pattern templates", "Process execution checkpoints"],
+    outcomes: ["Familiar workflow building for integration teams", "Lower migration friction from existing Boomi designs"],
+    screenshots: [
+      { title: "Boomi-style canvas", caption: "Build process blocks with clear start, action and decision paths." },
+      { title: "Connector pattern view", caption: "Reuse common connection patterns without rebuilding each flow." },
+    ],
+  },
+  "vectordb-shapes": {
+    useCase: "For products that search documents, tickets, policies or product content with semantic retrieval.",
+    capabilities: ["Vector index setup", "Similarity search blocks", "Retrieval filters for tenant and product scope"],
+    outcomes: ["Better search relevance", "Faster access to knowledge inside workflows"],
+    screenshots: [
+      { title: "Vector index setup", caption: "Define source collections, embedding rules and refresh cadence.", src: vectorDbShapeImage },
+      { title: "Semantic search test", caption: "Preview matched records, scores and metadata filters." },
+    ],
+  },
+  "api-connector-shapes": {
+    useCase: "For teams that connect flows to REST APIs, webhooks and authenticated external services.",
+    capabilities: ["REST request configuration", "Webhook triggers", "Auth headers and retry controls"],
+    outcomes: ["Fewer custom connector builds", "More reliable endpoint handoffs"],
+    screenshots: [
+      { title: "API request setup", caption: "Configure method, URL, headers, body and expected response.", src: apiShapeImage },
+      { title: "Webhook monitor", caption: "Track payload delivery, retries and failed calls." },
+    ],
+  },
+  "event-stream-shapes": {
+    useCase: "For products that need event intake, routing, replay and recovery across high-volume workflows.",
+    capabilities: ["Event topic routing", "Replay and retry paths", "Dead-letter visibility for failed events"],
+    outcomes: ["Higher resilience during traffic spikes", "Clearer debugging for missed events"],
+    screenshots: [
+      { title: "Event routing board", caption: "Route event types to actions, queues and fallback branches." },
+      { title: "Replay console", caption: "Replay failed events after fixes without losing context." },
+    ],
+  },
+  "sap-workflow-bot": {
+    useCase: "For guided SAP task execution where approvals, handoffs and auditability matter.",
+    capabilities: ["SAP-aware task sequences", "Approval gates", "Execution status tracking"],
+    outcomes: ["Less manual SAP navigation", "Clearer ownership for operational handoffs"],
+    screenshots: [
+      { title: "SAP task runner", caption: "Run guided steps with required approvals and audit notes." },
+      { title: "Approval timeline", caption: "See pending approvals, owners and completed SAP actions." },
+    ],
+  },
+  "invoice-automation": {
+    useCase: "For finance teams that capture invoice details, validate fields and route exceptions.",
+    capabilities: ["Invoice data extraction", "Validation against rules", "Exception routing for finance review"],
+    outcomes: ["Faster invoice processing", "Fewer payment delays from missing data"],
+    screenshots: [
+      { title: "Invoice capture", caption: "Extract supplier, total, line items and tax fields." },
+      { title: "Exception queue", caption: "Route mismatches to finance reviewers with evidence." },
+    ],
+  },
+  "purchase-order-automation": {
+    useCase: "For procurement teams that create, reconcile and track purchase-order workflows.",
+    capabilities: ["PO generation steps", "Three-way matching support", "Reconciliation status tracking"],
+    outcomes: ["Cleaner procurement handoffs", "Reduced mismatch resolution time"],
+    screenshots: [
+      { title: "PO workflow", caption: "Create request, approval and reconciliation steps in one flow." },
+      { title: "Matching review", caption: "Compare invoice, receipt and purchase-order details." },
+    ],
+  },
+  "successfactors-sync": {
+    useCase: "For HR teams that need employee lifecycle data synchronized with operational systems.",
+    capabilities: ["Employee record synchronization", "Lifecycle event triggers", "Field mapping for HR profiles"],
+    outcomes: ["Better HR data consistency", "Faster onboarding and offboarding flows"],
+    screenshots: [
+      { title: "HR sync rules", caption: "Choose fields, lifecycle events and destination systems." },
+      { title: "Sync health", caption: "Monitor successful updates, warnings and failed records." },
+    ],
+  },
+  "sap-connector-pack": {
+    useCase: "For teams that need reusable SAP endpoint connectors without rebuilding integration plumbing.",
+    capabilities: ["Prebuilt SAP service connectors", "Credential and tenant scoping", "Request and response templates"],
+    outcomes: ["Quicker SAP integration setup", "More consistent connector governance"],
+    screenshots: [
+      { title: "Connector library", caption: "Select prebuilt SAP connectors by service and purpose." },
+      { title: "Connection health", caption: "Review auth status, last sync and service warnings." },
+    ],
+  },
+  "app-builder": {
+    useCase: "For building internal tools, admin screens and customer-facing modules with data-backed actions.",
+    capabilities: ["Screen composition", "Action buttons and forms", "Data-bound tables and detail views"],
+    outcomes: ["Faster internal tool delivery", "Less dependence on one-off frontend work"],
+    screenshots: [
+      { title: "Screen builder", caption: "Compose forms, tables and action areas from reusable blocks." },
+      { title: "Data binding panel", caption: "Connect UI fields to APIs, tables and workflow actions." },
+    ],
+  },
+  "workflow-engine": {
+    useCase: "For modeling approvals, branching logic, scheduled jobs and recurring operational processes.",
+    capabilities: ["Visual workflow steps", "Branching and approvals", "Schedules and background jobs"],
+    outcomes: ["Repeatable business processes", "Fewer manual status checks"],
+    screenshots: [
+      { title: "Workflow designer", caption: "Build steps, decisions, approvals and automated actions." },
+      { title: "Run history", caption: "Inspect completed, pending and failed workflow runs." },
+    ],
+  },
+  "api-sdk": {
+    useCase: "For developer teams that need generated clients and clear integration helpers.",
+    capabilities: ["Generated API clients", "Endpoint examples", "Auth and error-handling helpers"],
+    outcomes: ["Faster developer onboarding", "More consistent API usage across teams"],
+    screenshots: [
+      { title: "SDK explorer", caption: "Browse generated methods, request shapes and examples." },
+      { title: "Integration sample", caption: "Copy working snippets for common API operations." },
+    ],
+  },
+  "extension-marketplace": {
+    useCase: "For teams packaging reusable extensions, templates and add-ons for customer or internal use.",
+    capabilities: ["Extension packaging", "Version publishing", "Marketplace listing controls"],
+    outcomes: ["Reusable app capabilities", "Cleaner release management for add-ons"],
+    screenshots: [
+      { title: "Extension catalog", caption: "List extensions by category, version and install status." },
+      { title: "Publish flow", caption: "Package, review and publish new extension versions." },
+    ],
+  },
+  "role-builder": {
+    useCase: "For administrators defining module-specific roles, scopes and access boundaries.",
+    capabilities: ["Role templates", "Permission scopes", "Access review visibility"],
+    outcomes: ["Safer customer and team access", "Simpler permission reviews"],
+    screenshots: [
+      { title: "Permission matrix", caption: "Assign view, edit, approve and admin scopes per module." },
+      { title: "Role preview", caption: "Preview what each role can access before publishing." },
+    ],
+  },
+  "email-orchestration": {
+    useCase: "For teams managing lifecycle emails, product notifications and transactional messages.",
+    capabilities: ["Template management", "Queue and delivery tracking", "Audience and event triggers"],
+    outcomes: ["More reliable email delivery", "Clearer message governance"],
+    screenshots: [
+      { title: "Template studio", caption: "Edit content, variables and trigger rules in one place." },
+      { title: "Delivery queue", caption: "Track sent, pending, bounced and failed email events." },
+    ],
+  },
+  "sms-gateway": {
+    useCase: "For time-sensitive phone alerts, verification messages and operational notifications.",
+    capabilities: ["SMS templates", "Provider routing", "Delivery receipt tracking"],
+    outcomes: ["Faster critical alerts", "Better visibility into failed phone delivery"],
+    screenshots: [
+      { title: "SMS campaign setup", caption: "Configure message text, recipients and delivery provider." },
+      { title: "Delivery receipts", caption: "Monitor delivered, failed and pending phone alerts." },
+    ],
+  },
+  "web-push": {
+    useCase: "For browser push notifications tied to important product events.",
+    capabilities: ["Push subscription management", "Event-triggered notifications", "Delivery and opt-in reporting"],
+    outcomes: ["More immediate product updates", "Better reach for active browser users"],
+    screenshots: [
+      { title: "Push rule setup", caption: "Trigger browser notifications from product events." },
+      { title: "Opt-in analytics", caption: "Review subscriptions, sends and delivery rates." },
+    ],
+  },
+  "in-app-inbox": {
+    useCase: "For persistent notifications that users can review inside the product experience.",
+    capabilities: ["Inbox message types", "Read and unread states", "Actionable notification links"],
+    outcomes: ["Fewer missed product messages", "A cleaner record of user-facing alerts"],
+    screenshots: [
+      { title: "Inbox preview", caption: "Review message cards, priorities and user actions." },
+      { title: "Message composer", caption: "Create in-app messages with audience and expiration rules." },
+    ],
+  },
+  "alert-rules": {
+    useCase: "For triggering notifications from thresholds, incidents, failed jobs and renewal events.",
+    capabilities: ["Threshold rules", "Incident routing", "Renewal and failure triggers"],
+    outcomes: ["Earlier response to issues", "Less manual monitoring for account teams"],
+    screenshots: [
+      { title: "Rule builder", caption: "Define conditions, severity, recipients and escalation paths." },
+      { title: "Alert timeline", caption: "See triggered alerts, owners and resolution status." },
+    ],
+  },
+  "prompt-studio": {
+    useCase: "For teams that need prompt versioning, testing and controlled AI behavior.",
+    capabilities: ["Prompt versions", "Side-by-side output tests", "Input and output guardrails"],
+    outcomes: ["More predictable AI responses", "Faster iteration for AI use cases"],
+    screenshots: [
+      { title: "Prompt editor", caption: "Version prompts with test data and expected outputs." },
+      { title: "Comparison view", caption: "Compare outputs across prompt versions before release." },
+    ],
+  },
+  "agent-builder": {
+    useCase: "For building AI agents that can take task-focused actions with controlled tools.",
+    capabilities: ["Agent instructions", "Tool and action binding", "Approval checks for risky steps"],
+    outcomes: ["Automated task support", "Better control over AI actions"],
+    screenshots: [
+      { title: "Agent setup", caption: "Define agent goals, tools, guardrails and escalation rules." },
+      { title: "Action trace", caption: "Inspect tool calls, decisions and handoff points." },
+    ],
+  },
+  "knowledge-base-rag": {
+    useCase: "For grounding AI answers in product docs, tickets, policies and operational knowledge.",
+    capabilities: ["Knowledge source ingestion", "Retrieval filters", "Source citation controls"],
+    outcomes: ["Answers grounded in approved content", "Less repeated support research"],
+    screenshots: [
+      { title: "Knowledge sources", caption: "Connect docs, tickets and files for retrieval." },
+      { title: "Answer grounding", caption: "Preview retrieved sources and answer confidence." },
+    ],
+  },
+  "evaluation-suite": {
+    useCase: "For scoring AI quality, regressions, safety and answer usefulness before releases.",
+    capabilities: ["Test sets and rubrics", "Regression comparisons", "Safety and quality scoring"],
+    outcomes: ["Lower AI release risk", "Clearer evidence for model or prompt changes"],
+    screenshots: [
+      { title: "Evaluation run", caption: "Score answers across quality, safety and accuracy checks." },
+      { title: "Regression report", caption: "Compare new results against previous releases." },
+    ],
+  },
+  "ai-audit-logs": {
+    useCase: "For tracing prompts, responses, tool calls and user decisions for governance.",
+    capabilities: ["Prompt and response history", "Tool-call audit trails", "User decision tracking"],
+    outcomes: ["Stronger AI governance", "Faster investigation of AI-assisted decisions"],
+    screenshots: [
+      { title: "Audit timeline", caption: "Trace prompts, responses, actions and reviewers." },
+      { title: "Governance filters", caption: "Filter AI activity by user, tenant, model and risk." },
+    ],
+  },
+}
+
+const getSubModuleDetails = (module, subModule) => {
+  const detail = submoduleDetails[subModule.id]
+
+  if (detail) {
+    return detail
+  }
+
+  return {
+    useCase: `For teams that need ${subModule.name.toLowerCase()} capabilities inside ${module.name}.`,
+    capabilities: [
+      `${subModule.name} configuration`,
+      "Operational tracking and validation",
+      "Reusable settings for future workflows",
+    ],
+    outcomes: ["Clearer setup decisions", "Better visibility for account and support teams"],
+    screenshots: [
+      { title: `${subModule.name} workspace`, caption: "Configure the submodule and preview its key settings." },
+      { title: `${subModule.name} status`, caption: "Review activity, issues and usage signals." },
+    ],
+  }
+}
+
+function ScreenshotPreview({ screenshot, index }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="flex items-center gap-1 border-b border-border bg-secondary/60 px-3 py-2">
+        <span className="h-2 w-2 rounded-full bg-destructive/70" />
+        <span className="h-2 w-2 rounded-full bg-warning/80" />
+        <span className="h-2 w-2 rounded-full bg-success/80" />
+        <span className="ml-2 truncate text-xs text-muted-foreground">{screenshot.title}</span>
+      </div>
+      <div className="space-y-3 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{screenshot.title}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{screenshot.caption}</p>
+          </div>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <ImageIcon className="h-4 w-4 text-primary" />
+          </div>
+        </div>
+        {screenshot.src ? (
+          <div className="overflow-hidden rounded-md border border-border bg-background/40">
+            <img
+              src={screenshot.src}
+              alt={`${screenshot.title} screenshot`}
+              className="max-h-[28rem] w-full object-contain"
+              loading="lazy"
+            />
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="rounded-md border border-border bg-background/40 p-2">
+                  <div
+                    className={cn(
+                      "mb-2 h-1.5 rounded-full",
+                      item === 0 && "bg-primary",
+                      item === 1 && "bg-accent",
+                      item === 2 && "bg-success",
+                    )}
+                    style={{ width: `${55 + item * 14 + index * 4}%` }}
+                  />
+                  <div className="h-2 rounded bg-muted" />
+                  <div className="mt-1 h-2 w-2/3 rounded bg-muted" />
+                </div>
+              ))}
+            </div>
+            <div className="rounded-md border border-border bg-background/40 p-3">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="h-2 w-28 rounded bg-muted" />
+                <div className="h-5 w-16 rounded-full bg-primary/15" />
+              </div>
+              <div className="space-y-2">
+                {[0, 1, 2].map((row) => (
+                  <div key={row} className="grid grid-cols-[1fr_3rem] gap-3">
+                    <div className="h-2 rounded bg-muted" />
+                    <div className="h-2 rounded bg-muted" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SubModuleDetailSheet({ detail, isSelected, onClose, onToggleSelection }) {
+  const open = Boolean(detail)
+  const module = detail?.module
+  const subModule = detail?.subModule
+  const subModuleDetail = module && subModule ? getSubModuleDetails(module, subModule) : null
+  const Icon = module?.icon || Package
+
+  return (
+    <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      {module && subModule && subModuleDetail && (
+        <SheetContent className="glass-strong border-border p-0 gap-0 w-full sm:max-w-2xl">
+          <SheetHeader className="border-b border-border p-5 pr-12">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <Icon className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <SheetTitle className="text-xl">{subModule.name}</SheetTitle>
+                <SheetDescription className="mt-1">
+                  {module.name} - {module.submoduleLabel}
+                </SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
+
+          <div className="h-[calc(100vh-9.5rem)] overflow-y-auto">
+            <div className="space-y-5 p-5">
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-normal text-primary">Submodule overview</p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{subModule.description}</p>
+                    <p className="mt-3 text-sm leading-6 text-foreground">{subModuleDetail.useCase}</p>
+                  </div>
+                  <div className="shrink-0 rounded-lg border border-border bg-background/40 p-3 text-right">
+                    <p className="text-xs text-muted-foreground">Annual add-on</p>
+                    <p className="text-2xl font-bold text-primary">${subModule.price}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{isSelected ? "Selected" : "Not selected"}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-3 flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold text-foreground">Screenshots</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  {subModuleDetail.screenshots.map((screenshot, index) => (
+                    <ScreenshotPreview key={screenshot.title} screenshot={screenshot} index={index} />
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-lg border border-border bg-secondary/20 p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <ListChecks className="h-4 w-4 text-primary" />
+                    <h3 className="font-semibold text-foreground">What it includes</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {subModuleDetail.capabilities.map((item) => (
+                      <div key={item} className="flex gap-2 text-sm text-muted-foreground">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-secondary/20 p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Info className="h-4 w-4 text-accent" />
+                    <h3 className="font-semibold text-foreground">Client value</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {subModuleDetail.outcomes.map((item) => (
+                      <div key={item} className="flex gap-2 text-sm text-muted-foreground">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-card/60 p-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Module</p>
+                  <p className="mt-1 text-sm font-medium text-foreground">{module.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Category</p>
+                  <p className="mt-1 text-sm font-medium text-foreground">{module.category}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Plan impact</p>
+                  <p className="mt-1 text-sm font-medium text-foreground">+${subModule.price}/year</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-border p-4">
+            <Button
+              type="button"
+              onClick={onToggleSelection}
+              className={cn(
+                "w-full",
+                isSelected
+                  ? "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90 glow-blue",
+              )}
+            >
+              {isSelected ? "Remove from Plan" : "Add to Plan"}
+            </Button>
+          </div>
+        </SheetContent>
+      )}
+    </Sheet>
+  )
+}
+
 export default function RenewalPage() {
   const [searchParams] = useSearchParams()
   const [selectedPlan, setSelectedPlan] = useState("premium")
@@ -172,6 +630,7 @@ export default function RenewalPage() {
   const [storageGb, setStorageGb] = useState([250])
   const [teamSeats, setTeamSeats] = useState([10])
   const [environments, setEnvironments] = useState([2])
+  const [activeSubModuleDetail, setActiveSubModuleDetail] = useState(null)
 
   const requestedProductId = Number(searchParams.get("productId"))
 
@@ -202,6 +661,9 @@ export default function RenewalPage() {
   const selectedExistingLicense =
     licenses.find((license) => Number(license.product_id) === Number(selectedProductId)) || null
   const checkoutLabel = selectedExistingLicense ? "Renew / Upgrade" : "New Purchase"
+  const activeSubModuleIsSelected = activeSubModuleDetail
+    ? selectedSubModules[activeSubModuleDetail.module.id]?.includes(activeSubModuleDetail.subModule.id)
+    : false
 
   const toggleModule = (moduleId) => {
     const module = moduleCatalog.find((item) => item.id === moduleId)
@@ -237,6 +699,18 @@ export default function RenewalPage() {
     })
   }
 
+  const openSubModuleDetail = (module, subModule) => {
+    setActiveSubModuleDetail({ module, subModule })
+  }
+
+  const toggleActiveSubModule = () => {
+    if (!activeSubModuleDetail) {
+      return
+    }
+
+    toggleSubModule(activeSubModuleDetail.module.id, activeSubModuleDetail.subModule.id)
+  }
+
   const getExpirationAt = () => {
     const currentExpiration = selectedExistingLicense?.expiration_at ? new Date(selectedExistingLicense.expiration_at) : null
     const now = new Date()
@@ -265,6 +739,54 @@ export default function RenewalPage() {
       `${teamSeats[0]} seats`,
       `${environments[0]} envs`,
     ].join(" | ")
+  }
+
+  const getCustomPlanFields = () => {
+    if (!isCustomPlan) {
+      return null
+    }
+
+    return {
+      planId: plan.id,
+      planName: plan.name,
+      duration: {
+        id: duration.id,
+        label: duration.label,
+        multiplier: duration.multiplier,
+        discount: duration.discount || null,
+      },
+      selectedFields: {
+        moduleIds: selectedModules,
+        subModuleIdsByModule: selectedSubModules,
+      },
+      modules: selectedModuleItems.map((module) => ({
+        id: module.id,
+        name: module.name,
+        category: module.category,
+        basePrice: module.price,
+        submoduleLabel: module.submoduleLabel,
+        submodules: getSelectedSubModuleItems(module).map((subModule) => ({
+          id: subModule.id,
+          name: subModule.name,
+          price: subModule.price,
+          description: subModule.description,
+        })),
+      })),
+      infrastructure: {
+        monthlyRequests: monthlyRequests[0],
+        storageGb: storageGb[0],
+        teamSeats: teamSeats[0],
+        environments: environments[0],
+      },
+      pricing: {
+        moduleBaseSubtotal: Number(moduleBaseSubtotal.toFixed(2)),
+        subModuleSubtotal: Number(subModuleSubtotal.toFixed(2)),
+        infrastructureSubtotal: Number(infraSubtotal.toFixed(2)),
+        yearlyBasePrice: Number(yearlyBasePrice.toFixed(2)),
+        totalPrice: Number(totalPrice.toFixed(2)),
+        currency: "USD",
+      },
+    }
   }
 
   const fetchRenewalContext = async () => {
@@ -312,7 +834,8 @@ export default function RenewalPage() {
     setSubmitting(true)
 
     try {
-      const { data } = await licensesApi.checkout({
+      const customPlanFields = getCustomPlanFields()
+      const checkoutPayload = {
         product_id: selectedProduct.id,
         expiration_at: getExpirationAt(),
         amount: totalPrice.toFixed(2),
@@ -323,7 +846,13 @@ export default function RenewalPage() {
         plan_name: plan.name,
         duration_label: duration.label,
         purchase_summary: getPurchaseSummary(),
-      })
+      }
+
+      if (customPlanFields) {
+        checkoutPayload.custom_plan = customPlanFields
+      }
+
+      const { data } = await licensesApi.checkout(checkoutPayload)
 
       const normalizedLicense = {
         ...data.license,
@@ -654,32 +1183,48 @@ export default function RenewalPage() {
                                 const selected = selectedSubModuleIds.includes(subModule.id)
 
                                 return (
-                                  <button
+                                  <div
                                     key={subModule.id}
-                                    type="button"
-                                    onClick={() => toggleSubModule(module.id, subModule.id)}
                                     className={cn(
-                                      "text-left p-3 rounded-lg border transition-all bg-background/30 hover:bg-secondary/50",
+                                      "overflow-hidden rounded-lg border transition-all bg-background/30",
                                       selected && "border-primary bg-primary/10",
                                       !selected && "border-border",
                                     )}
                                   >
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div>
-                                        <p className="font-medium text-foreground">{subModule.name}</p>
-                                        <p className="text-xs text-muted-foreground mt-1">{subModule.description}</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleSubModule(module.id, subModule.id)}
+                                      className="w-full p-3 text-left transition-colors hover:bg-secondary/50"
+                                    >
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                          <p className="font-medium text-foreground">{subModule.name}</p>
+                                          <p className="text-xs text-muted-foreground mt-1">{subModule.description}</p>
+                                        </div>
+                                        <div
+                                          className={cn(
+                                            "w-5 h-5 rounded-full border flex items-center justify-center shrink-0",
+                                            selected ? "border-primary bg-primary" : "border-muted-foreground",
+                                          )}
+                                        >
+                                          {selected && <Check className="w-3 h-3 text-primary-foreground" />}
+                                        </div>
                                       </div>
-                                      <div
-                                        className={cn(
-                                          "w-5 h-5 rounded-full border flex items-center justify-center shrink-0",
-                                          selected ? "border-primary bg-primary" : "border-muted-foreground",
-                                        )}
+                                    </button>
+                                    <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2">
+                                      <p className="text-sm font-semibold text-primary">+${subModule.price}/year</p>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => openSubModuleDetail(module, subModule)}
+                                        className="h-8 px-2 text-primary"
                                       >
-                                        {selected && <Check className="w-3 h-3 text-primary-foreground" />}
-                                      </div>
+                                        <Eye className="h-4 w-4" />
+                                        Details
+                                      </Button>
                                     </div>
-                                    <p className="text-sm font-semibold text-primary mt-3">+${subModule.price}/year</p>
-                                  </button>
+                                  </div>
                                 )
                               })}
                             </div>
@@ -1026,6 +1571,12 @@ export default function RenewalPage() {
         </>
         )}
       </main>
+      <SubModuleDetailSheet
+        detail={activeSubModuleDetail}
+        isSelected={Boolean(activeSubModuleIsSelected)}
+        onClose={() => setActiveSubModuleDetail(null)}
+        onToggleSelection={toggleActiveSubModule}
+      />
     </div>
   )
 }

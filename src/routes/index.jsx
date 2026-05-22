@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom"
 import AdminLayout from "@/components/AdminLayout"
 
+import LandingPage from "@/pages/LandingPage"
 import LoginPage from "@/pages/LoginPage"
 import DashboardPage from "@/pages/admin/DashboardPage"
 import LicensesPage from "@/pages/admin/LicensesPage"
@@ -13,7 +14,7 @@ import NotificationsPage from "@/pages/admin/NotificationsPage"
 import ApiConsolePage from "@/pages/admin/ApiConsolePage"
 import PortalPage from "@/pages/portal/PortalPage"
 import RenewalPage from "@/pages/portal/RenewalPage"
-import ProtectedRoute from "../components/ProtectedRout"
+import ProtectedRoute, { PublicOnlyRoute } from "../components/ProtectedRout"
 import RegisterPage from "../pages/RegisterPage"
 import ProductsPage from "../pages/admin/ProductsPage"
 import ProductDetailPage from "../pages/admin/ProductDetailPage"
@@ -22,9 +23,14 @@ export default function AppRoutes() {
   return (
     <Routes>
 
-      <Route path="/" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route element={<ProtectedRoute />}>
+      <Route path="/" element={<LandingPage />} />
+
+      <Route element={<PublicOnlyRoute />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+      </Route>
+
+      <Route element={<ProtectedRoute requireAdmin />}>
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="licenses" element={<LicensesPage />} />
@@ -40,8 +46,10 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      <Route path="/portal" element={<PortalPage />} />
-      <Route path="/portal/renew" element={<RenewalPage />} />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/portal" element={<PortalPage />} />
+        <Route path="/portal/renew" element={<RenewalPage />} />
+      </Route>
     </Routes>
   )
 }

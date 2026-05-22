@@ -209,6 +209,213 @@
   }
 }
 
+@keyframes avaxia-stream {
+  0% {
+    transform: translateX(-18rem);
+  }
+  100% {
+    transform: translateX(calc(100vw + 18rem));
+  }
+}
+
+@keyframes avaxia-scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes avaxia-radar-sweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes avaxia-float-card {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes avaxia-packet {
+  0% {
+    transform: translateX(-6rem);
+    opacity: 0;
+  }
+  15%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(22rem);
+    opacity: 0;
+  }
+}
+
+@keyframes avaxia-rise-card {
+  0% {
+    transform: translateY(14px);
+    opacity: 0.72;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes avaxia-progress {
+  0% {
+    width: 0;
+  }
+  100% {
+    width: var(--avaxia-progress-width);
+  }
+}
+
+@keyframes avaxia-title-shine {
+  0% {
+    background-position: -160% 50%;
+  }
+  100% {
+    background-position: 160% 50%;
+  }
+}
+
+@keyframes avaxia-dev-badge {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(1deg);
+  }
+}
+
+@keyframes avaxia-chip {
+  0%,
+  100% {
+    transform: translateY(0);
+    border-color: var(--border);
+  }
+  50% {
+    transform: translateY(-3px);
+    border-color: color-mix(in oklch, var(--primary), transparent 35%);
+  }
+}
+
+@keyframes avaxia-preview-line {
+  0%,
+  100% {
+    transform: scaleX(0.35);
+    transform-origin: left;
+    opacity: 0.45;
+  }
+  50% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes avaxia-orbit-dot {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(16rem, 1.5rem);
+  }
+  50% {
+    transform: translate(14rem, 8rem);
+  }
+  75% {
+    transform: translate(1.5rem, 7rem);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes avaxia-story-flow {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  20%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes avaxia-pulse-dot {
+  0%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes avaxia-mini-screen {
+  0%,
+  100% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+}
+
+@keyframes avaxia-fill-bar {
+  0% {
+    width: 0;
+  }
+  100% {
+    width: var(--fill-width);
+  }
+}
+
+@keyframes avaxia-flow-line {
+  0%,
+  100% {
+    transform: scaleX(0.55);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes avaxia-gateway-pulse {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  20%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(4rem);
+    opacity: 0;
+  }
+}
+
 .animate-float {
   animation: float 3s ease-in-out infinite;
 }
@@ -272,6 +479,166 @@
 
 .app-radial-bg {
   background: radial-gradient(ellipse at top, var(--app-gradient-start) 0%, var(--background) 72%);
+}
+
+.avaxia-grid {
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--primary), transparent 88%) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--accent), transparent 90%) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+.avaxia-stream {
+  position: absolute;
+  left: 0;
+  height: 1px;
+  width: 18rem;
+  background: color-mix(in oklch, var(--primary), transparent 20%);
+  box-shadow: 0 0 18px color-mix(in oklch, var(--primary), transparent 35%);
+  animation: avaxia-stream 7s linear infinite;
+}
+
+.avaxia-stream-one {
+  animation-delay: 0s;
+}
+
+.avaxia-stream-two {
+  width: 13rem;
+  background: color-mix(in oklch, var(--accent), transparent 22%);
+  animation-delay: 1.6s;
+  animation-duration: 8.5s;
+}
+
+.avaxia-stream-three {
+  width: 16rem;
+  background: color-mix(in oklch, var(--warning), transparent 24%);
+  animation-delay: 3s;
+  animation-duration: 9.2s;
+}
+
+.avaxia-scan {
+  background: linear-gradient(180deg, transparent, color-mix(in oklch, var(--accent), transparent 68%), transparent);
+  animation: avaxia-scan 2.8s linear infinite;
+}
+
+.avaxia-radar-sweep {
+  background:
+    conic-gradient(from 0deg, color-mix(in oklch, var(--primary), transparent 70%), transparent 34%),
+    radial-gradient(circle, transparent 60%, color-mix(in oklch, var(--accent), transparent 82%) 61%, transparent 64%);
+  animation: avaxia-radar-sweep 12s linear infinite;
+}
+
+.avaxia-float-card {
+  animation: avaxia-float-card 4.6s ease-in-out infinite;
+}
+
+.avaxia-packet {
+  box-shadow: 0 0 14px color-mix(in oklch, var(--primary), transparent 35%);
+  animation: avaxia-packet 3.2s linear infinite;
+}
+
+.avaxia-rise-card {
+  animation: avaxia-rise-card 0.9s ease both;
+}
+
+.avaxia-progress {
+  width: 0;
+  animation: avaxia-progress 1.8s ease-out forwards;
+}
+
+.avaxia-title-shine {
+  background: linear-gradient(
+    100deg,
+    var(--foreground) 0%,
+    var(--foreground) 35%,
+    var(--primary) 48%,
+    var(--accent) 55%,
+    var(--foreground) 68%,
+    var(--foreground) 100%
+  );
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: avaxia-title-shine 4.5s ease-in-out infinite;
+}
+
+.avaxia-dev-badge {
+  animation: avaxia-dev-badge 3.6s ease-in-out infinite;
+}
+
+.avaxia-chip {
+  animation: avaxia-chip 3.8s ease-in-out infinite;
+}
+
+.avaxia-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 25% 20%, color-mix(in oklch, var(--primary), transparent 70%), transparent 35%),
+    radial-gradient(circle at 75% 80%, color-mix(in oklch, var(--accent), transparent 74%), transparent 32%);
+}
+
+.avaxia-preview-line {
+  animation: avaxia-preview-line 2.8s ease-in-out infinite;
+}
+
+.avaxia-orbit-dot {
+  left: 1rem;
+  top: 1rem;
+  animation: avaxia-orbit-dot 5.6s linear infinite;
+}
+
+.avaxia-orbit-dot-two {
+  animation-direction: reverse;
+  animation-duration: 6.4s;
+}
+
+.avaxia-story-flow {
+  animation: avaxia-story-flow 3.6s linear infinite;
+}
+
+.avaxia-pulse-dot {
+  animation: avaxia-pulse-dot 1.4s ease-in-out infinite;
+}
+
+.avaxia-mini-screen {
+  background:
+    linear-gradient(135deg, color-mix(in oklch, var(--primary), transparent 82%), transparent 42%),
+    linear-gradient(45deg, transparent, color-mix(in oklch, var(--accent), transparent 78%), transparent);
+  background-size: 180% 180%;
+  animation: avaxia-mini-screen 3.5s ease-in-out infinite;
+}
+
+.avaxia-platform-grid {
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--primary), transparent 88%) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--primary), transparent 88%) 1px, transparent 1px),
+    radial-gradient(circle at 20% 20%, color-mix(in oklch, var(--primary), transparent 82%), transparent 28%),
+    radial-gradient(circle at 80% 10%, color-mix(in oklch, var(--success), transparent 86%), transparent 24%);
+  background-size: 38px 38px, 38px 38px, auto, auto;
+}
+
+.avaxia-fill-bar {
+  width: 0;
+  animation: avaxia-fill-bar 1.6s ease-out forwards;
+}
+
+.avaxia-flow-line {
+  transform-origin: center;
+  animation: avaxia-flow-line 2.4s ease-in-out infinite;
+}
+
+.avaxia-gateway-pulse {
+  position: absolute;
+  right: -2.1rem;
+  top: 50%;
+  height: 0.5rem;
+  width: 0.5rem;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 16px color-mix(in oklch, var(--primary), transparent 45%);
+  animation: avaxia-gateway-pulse 2.2s linear infinite;
 }
 
 .code-panel {

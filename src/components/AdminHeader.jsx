@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { authApi } from "@/lib/api"
+import { clearAuthSession } from "@/lib/auth"
 
 export function AdminHeader({ title, subtitle }) {
   const navigate = useNavigate()
@@ -39,8 +40,8 @@ export function AdminHeader({ title, subtitle }) {
   }, [])
 
   const handleLogout = () => {
-    localStorage.removeItem("token")
-    navigate("/")
+    clearAuthSession()
+    navigate("/login")
   }
 
   return (

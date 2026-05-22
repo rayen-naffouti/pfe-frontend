@@ -19,6 +19,7 @@ import {
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { clearAuthSession } from "@/lib/auth"
 
 const navItems = [
   { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -92,7 +93,8 @@ export function AdminSidebar() {
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
               <Link
-                to="/"
+                to="/login"
+                onClick={clearAuthSession}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive transition-all duration-200",
                   collapsed && "justify-center",

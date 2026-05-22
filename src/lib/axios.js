@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearAuthSession, getAuthRole } from "./auth"
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL?.trim() || "http://localhost:8080/api",
@@ -22,9 +23,20 @@ api.interceptors.response.use(
     );
 
     if (error.response?.status === 401 && !isAuthRequest && localStorage.getItem("token")) {
-      localStorage.removeItem("token");
-      window.location.href = "/";
+      clearAuthSession();
+      window.location.href = "/login";
     }
+
+    if (error.response?.status === 403 && !isAuthRequest && error.response?.data?.message === "Invalid token") {
+      clearAuthSession();
+      window.location.href = "/login";
+    } else if (error.response?.status === 403 && error.response?.data?.message === "Admin access is required") {
+      localStorage.setItem("authRole", "user");
+      window.location.href = "/portal";
+    } else if (error.response?.status === 403 && !isAuthRequest && getAuthRole() !== "admin") {
+      window.location.href = "/portal";
+    }
+
     return Promise.reject(error);
   }
 );

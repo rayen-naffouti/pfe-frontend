@@ -21,8 +21,10 @@ import {
   Globe2,
   ArrowRight,
   ShoppingCart,
+  LayoutDashboard,
 } from "lucide-react"
 import { customersApi, getApiErrorMessage, productsApi } from "@/lib/api"
+import { clearAuthSession, getAuthRole } from "@/lib/auth"
 import { formatCurrency, formatDate, getLicenseStatus } from "@/lib/formatters"
 
 const STANDARD_PLAN_START_PRICE = 999
@@ -62,6 +64,7 @@ export default function PortalPage() {
   const primaryLicense = licenses[0]
   const activeLicensesCount = licenses.filter((license) => ["valid", "expiring"].includes(getLicenseStatus(license))).length
   const ownedProductIds = new Set(licenses.map((license) => Number(license.product_id)))
+  const isAdmin = getAuthRole() === "admin"
   const licensePeriod = useMemo(() => {
     if (!primaryLicense?.expiration_at) {
       return { daysRemaining: 0, progress: 0 }
@@ -85,7 +88,7 @@ export default function PortalPage() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem("token")
+    clearAuthSession()
   }
 
   return (
@@ -103,6 +106,14 @@ export default function PortalPage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            {isAdmin && (
+              <Button variant="outline" className="hidden border-border bg-transparent md:inline-flex" asChild>
+                <Link to="/admin/dashboard">
+                  <LayoutDashboard className="w-4 h-4 mr-2" />
+                  Admin Dashboard
+                </Link>
+              </Button>
+            )}
             <ThemeToggle />
             <Button variant="ghost" size="icon">
               <Bell className="w-5 h-5" />
@@ -111,7 +122,7 @@ export default function PortalPage() {
               <User className="w-5 h-5" />
             </Button>
             <Button variant="ghost" size="icon" asChild>
-              <Link to="/" onClick={handleLogout}>
+              <Link to="/login" onClick={handleLogout}>
                 <LogOut className="w-5 h-5" />
               </Link>
             </Button>
