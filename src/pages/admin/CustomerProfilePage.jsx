@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { AdminHeader } from "@/components/AdminHeader"
 import { StatusBadge } from "@/components/StatusBadge"
+import { LicenseKeyField } from "@/components/LicenseKeyField"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -172,9 +173,14 @@ export default function CustomerProfilePage() {
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium text-foreground">{license.product_name || "N/A"}</p>
-                        <code className="text-xs text-muted-foreground break-all">{license.license_key || `#${license.id}`}</code>
+                        <LicenseKeyField
+                          value={license.license_key}
+                          fallback={`#${license.id}`}
+                          className="mt-1 max-w-full"
+                          buttonClassName="h-7 w-7"
+                        />
                       </div>
                       <StatusBadge status={getLicenseStatus(license)} />
                     </div>

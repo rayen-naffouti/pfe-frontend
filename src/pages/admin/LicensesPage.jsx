@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { AdminHeader } from "@/components/AdminHeader"
 import { StatusBadge } from "@/components/StatusBadge"
+import { LicenseKeyField } from "@/components/LicenseKeyField"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -12,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
-import { Search, Filter, Plus, MoreHorizontal, Eye, Edit, Trash2, RefreshCw, Download, Copy } from "lucide-react"
+import { Search, Filter, Plus, MoreHorizontal, Eye, Edit, Trash2, RefreshCw, Download } from "lucide-react"
 import { getApiErrorMessage, licensesApi } from "@/lib/api"
 import { formatDate, getLicenseStatus } from "@/lib/formatters"
 
@@ -82,14 +83,6 @@ export default function LicensesPage() {
     } else {
       setSelectedLicenses([...selectedLicenses, licenseId])
     }
-  }
-
-  const copyLicenseKey = async (licenseKey) => {
-    if (!licenseKey) {
-      return
-    }
-
-    await navigator.clipboard.writeText(licenseKey)
   }
 
   return (
@@ -220,18 +213,13 @@ export default function LicensesPage() {
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <code className="text-sm font-mono text-primary max-w-48 truncate">
-                        {license.license_key || `#${license.id}`}
-                      </code>
-                      <button
-                        type="button"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => copyLicenseKey(license.license_key)}
-                      >
-                        <Copy className="w-3 h-3 text-muted-foreground hover:text-foreground" />
-                      </button>
-                    </div>
+                    <LicenseKeyField
+                      value={license.license_key}
+                      fallback={`#${license.id}`}
+                      className="max-w-56"
+                      codeClassName="text-sm text-primary"
+                      buttonClassName="h-7 w-7"
+                    />
                   </TableCell>
                   <TableCell className="font-medium text-foreground">{license.customer_username || "N/A"}</TableCell>
                   <TableCell className="text-muted-foreground">{license.product_name || "N/A"}</TableCell>

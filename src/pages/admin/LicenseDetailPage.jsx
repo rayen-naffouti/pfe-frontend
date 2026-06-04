@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
+import { LicenseKeyField } from "@/components/LicenseKeyField"
 import { getApiErrorMessage, licensesApi } from "@/lib/api"
 import { formatCurrency, formatDate, formatDateTime, getLicenseStatus } from "@/lib/formatters"
 import {
@@ -18,8 +19,6 @@ import {
   Shield,
   RefreshCw,
   Edit,
-  Copy,
-  Check,
   Monitor,
   Clock,
   ArrowLeft,
@@ -29,27 +28,42 @@ import {
   Server,
 } from "lucide-react"
 
+const decodeBase64UrlJson = (value) => {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/")
+  const padding = "=".repeat((4 - (normalized.length % 4)) % 4)
+  const binary = globalThis.atob(`${normalized}${padding}`)
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+  return JSON.parse(new TextDecoder().decode(bytes))
+}
+
 const decodeLicenseKey = (licenseKey) => {
-  if (!licenseKey || !licenseKey.startsWith("LIC-")) {
-    return { payload: null, error: "Unsupported license key format" }
+  if (!licenseKey) {
+    return { header: null, payload: null, error: "Missing token" }
   }
 
-  const [payloadBase64] = licenseKey.slice(4).split(".")
+  const token = licenseKey.startsWith("LIC-") ? licenseKey.slice(4) : licenseKey
+  const parts = token.split(".")
 
-  if (!payloadBase64) {
+  if (parts.length !== 2 && parts.length !== 3) {
     return { payload: null, error: "Missing token payload" }
   }
 
   try {
-    const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/")
-    const padding = "=".repeat((4 - (normalized.length % 4)) % 4)
-    const binary = globalThis.atob(`${normalized}${padding}`)
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
-    const payloadJson = new TextDecoder().decode(bytes)
+    if (parts.length === 3) {
+      return {
+        header: decodeBase64UrlJson(parts[0]),
+        payload: decodeBase64UrlJson(parts[1]),
+        error: null,
+      }
+    }
 
-    return { payload: JSON.parse(payloadJson), error: null }
+    return {
+      header: null,
+      payload: decodeBase64UrlJson(parts[0]),
+      error: null,
+    }
   } catch {
-    return { payload: null, error: "Unable to decode token payload" }
+    return { header: null, payload: null, error: "Unable to decode token payload" }
   }
 }
 
@@ -69,7 +83,6 @@ export default function LicenseDetailPage() {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [copied, setCopied] = useState(false)
 
   const fetchLicense = async () => {
     setLoading(true)
@@ -92,16 +105,6 @@ export default function LicenseDetailPage() {
   useEffect(() => {
     fetchLicense()
   }, [id])
-
-  const handleCopy = async () => {
-    if (!license?.license_key) {
-      return
-    }
-
-    await navigator.clipboard.writeText(license.license_key)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
 
   if (loading) {
     return (
@@ -144,13 +147,17 @@ export default function LicenseDetailPage() {
 
   const status = getLicenseStatus(license)
   const decodedLicense = decodeLicenseKey(license.license_key)
+  const tokenHeader = decodedLicense.header
   const tokenPayload = decodedLicense.payload
   const customPlan = tokenPayload?.customPlan || tokenPayload?.custom_plan || null
   const customPlanCurrency = customPlan?.pricing?.currency || "USD"
+  const tokenFeatures = Array.isArray(tokenPayload?.features) ? tokenPayload.features : []
+  const tokenLicenseId = tokenPayload?.licenseId || tokenPayload?.id
+  const tokenExpiration = tokenPayload?.expirationDate || (tokenPayload?.exp ? tokenPayload.exp * 1000 : null)
 
   return (
     <div className="min-h-screen">
-      <AdminHeader title="License Details" subtitle={license.license_key || `License #${license.id}`} />
+      <AdminHeader title="License Details" subtitle={`License #${license.id}`} />
 
       <div className="p-6 space-y-6">
         <Button variant="ghost" asChild className="mb-4">
@@ -199,12 +206,12 @@ export default function LicenseDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-secondary/30 border border-border">
-                  <code className="flex-1 text-lg font-mono text-primary break-all">{license.license_key}</code>
-                  <Button variant="ghost" size="icon" onClick={handleCopy}>
-                    {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
-                  </Button>
-                </div>
+                <LicenseKeyField
+                  value={license.license_key}
+                  wrap
+                  className="rounded-lg border border-border bg-secondary/30 p-4"
+                  codeClassName="max-h-24 overflow-auto text-sm text-primary"
+                />
               </CardContent>
             </Card>
 
@@ -222,21 +229,59 @@ export default function LicenseDetailPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                       <div className="rounded-lg border border-border bg-secondary/30 p-3">
-                        <p className="text-xs text-muted-foreground">Token License ID</p>
-                        <p className="mt-1 font-medium text-foreground">{tokenPayload?.id || "N/A"}</p>
+                        <p className="text-xs text-muted-foreground">Algorithm</p>
+                        <p className="mt-1 truncate font-medium text-foreground">{tokenHeader?.alg || "N/A"}</p>
                       </div>
                       <div className="rounded-lg border border-border bg-secondary/30 p-3">
-                        <p className="text-xs text-muted-foreground">Token Expiration</p>
-                        <p className="mt-1 font-medium text-foreground">
-                          {tokenPayload?.exp ? formatDate(tokenPayload.exp * 1000) : "N/A"}
+                        <p className="text-xs text-muted-foreground">Token License ID</p>
+                        <p className="mt-1 truncate font-medium text-foreground" title={tokenLicenseId || "N/A"}>
+                          {tokenLicenseId || "N/A"}
                         </p>
                       </div>
                       <div className="rounded-lg border border-border bg-secondary/30 p-3">
-                        <p className="text-xs text-muted-foreground">Embedded Plan</p>
-                        <p className="mt-1 font-medium text-foreground">{customPlan?.planName || "Standard token"}</p>
+                        <p className="text-xs text-muted-foreground">Customer</p>
+                        <p className="mt-1 truncate font-medium text-foreground" title={tokenPayload?.customer || "N/A"}>
+                          {tokenPayload?.customer || "N/A"}
+                        </p>
                       </div>
+                      <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <p className="text-xs text-muted-foreground">Cluster</p>
+                        <p className="mt-1 truncate font-medium text-foreground" title={tokenPayload?.clusterName || "N/A"}>
+                          {tokenPayload?.clusterName || "N/A"}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <p className="text-xs text-muted-foreground">Issued At</p>
+                        <p className="mt-1 font-medium text-foreground">{formatDateTime(tokenPayload?.issuedAt)}</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <p className="text-xs text-muted-foreground">Token Expiration</p>
+                        <p className="mt-1 font-medium text-foreground">{formatDate(tokenExpiration)}</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-border bg-secondary/20 p-4">
+                      <div className="mb-3 flex items-center gap-2">
+                        <ListChecks className="h-4 w-4 text-primary" />
+                        <h3 className="font-semibold text-foreground">Features</h3>
+                      </div>
+                      {tokenFeatures.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {tokenFeatures.map((feature) => (
+                            <span
+                              key={feature}
+                              className="inline-block max-w-full truncate rounded-md border border-border bg-background/40 px-2 py-1 text-xs text-foreground"
+                              title={feature}
+                            >
+                              {feature}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No features are embedded in this token.</p>
+                      )}
                     </div>
 
                     {customPlan ? (
@@ -327,11 +372,14 @@ export default function LicenseDetailPage() {
                           </pre>
                         </div>
                       </div>
-                    ) : (
-                      <div className="p-3 rounded-lg bg-secondary/30 border border-border text-sm text-muted-foreground">
-                        No custom plan fields are embedded in this license token.
-                      </div>
-                    )}
+                    ) : null}
+
+                    <div className="rounded-lg border border-border bg-background/40 p-4">
+                      <p className="mb-2 text-xs text-muted-foreground">Decoded payload</p>
+                      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-foreground">
+                        {JSON.stringify(tokenPayload, null, 2)}
+                      </pre>
+                    </div>
                   </>
                 )}
               </CardContent>

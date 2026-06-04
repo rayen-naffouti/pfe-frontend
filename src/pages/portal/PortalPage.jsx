@@ -4,6 +4,7 @@ import { MinotaurLogo } from "@/components/MinotaurLogo"
 import { ParticlesBackground } from "@/components/ParticlesBackground"
 import { StatusBadge } from "@/components/StatusBadge"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { LicenseKeyField } from "@/components/LicenseKeyField"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -150,12 +151,12 @@ export default function PortalPage() {
                       <div className="w-16 h-16 rounded-xl bg-primary/20 flex items-center justify-center">
                         <Key className="w-8 h-8 text-primary" />
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3">
                           <h2 className="text-xl font-bold text-foreground">{primaryLicense.product_name || "N/A"}</h2>
                           <StatusBadge status={getLicenseStatus(primaryLicense)} />
                         </div>
-                        <p className="text-muted-foreground">{primaryLicense.license_key}</p>
+                        <LicenseKeyField value={primaryLicense.license_key} className="mt-1 max-w-xl" />
                       </div>
                     </div>
                     <div className="flex-1 max-w-md">

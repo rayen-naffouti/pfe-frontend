@@ -6,6 +6,7 @@ import { MinotaurLogo } from "@/components/MinotaurLogo"
 import { ParticlesBackground } from "@/components/ParticlesBackground"
 import { StatusBadge } from "@/components/StatusBadge"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { LicenseKeyField } from "@/components/LicenseKeyField"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -741,6 +742,17 @@ export default function RenewalPage() {
     ].join(" | ")
   }
 
+  const getLicenseFeatures = () => {
+    if (!isCustomPlan) {
+      return plan.features
+    }
+
+    return selectedModuleItems.flatMap((module) => [
+      module.name,
+      ...getSelectedSubModuleItems(module).map((subModule) => `${module.name}: ${subModule.name}`),
+    ])
+  }
+
   const getCustomPlanFields = () => {
     if (!isCustomPlan) {
       return null
@@ -846,6 +858,7 @@ export default function RenewalPage() {
         plan_name: plan.name,
         duration_label: duration.label,
         purchase_summary: getPurchaseSummary(),
+        features: getLicenseFeatures(),
       }
 
       if (customPlanFields) {
@@ -1553,7 +1566,7 @@ export default function RenewalPage() {
                 </div>
                 <div className="space-y-2 rounded-lg bg-secondary/30 border border-border p-3 text-left">
                   <p className="text-xs text-muted-foreground">Generated License Key</p>
-                  <code className="block text-xs text-foreground break-all">{createdLicense?.license_key || "N/A"}</code>
+                  <LicenseKeyField value={createdLicense?.license_key} codeClassName="text-foreground" />
                 </div>
               </CardContent>
             </Card>
