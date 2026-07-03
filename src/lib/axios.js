@@ -2,7 +2,7 @@ import axios from "axios";
 import { clearAuthSession, getAuthRole } from "./auth"
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL?.trim() || "http://localhost:8080/api",
+  baseURL: import.meta.env.VITE_API_URL?.trim() || "/api",
 });
 
 // Add token to every request

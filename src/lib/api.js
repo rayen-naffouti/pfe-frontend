@@ -8,6 +8,12 @@ export const authApi = {
   login: (payload) => api.post("/auth/login", payload),
   register: (payload) => api.post("/auth/register", payload),
   profile: () => api.get("/auth/profile"),
+  resendActivation: (payload) => api.post("/auth/account-activation/resend", payload),
+  validateActivationToken: (token) => api.get("/auth/account-activation/validate", { params: { token } }),
+  activateAccount: (payload) => api.post("/auth/account-activation", payload),
+  forgotPassword: (payload) => api.post("/auth/forgot-password", payload),
+  validateResetToken: (token) => api.get("/auth/reset-password/validate", { params: { token } }),
+  resetPassword: (payload) => api.post("/auth/reset-password", payload),
 }
 
 export const customersApi = {
@@ -21,6 +27,7 @@ export const customersApi = {
 
 export const productsApi = {
   list: () => api.get("/products"),
+  get: (id) => api.get(`/products/${id}`),
   create: (payload) => api.post("/products", payload),
 }
 
@@ -34,4 +41,16 @@ export const licensesApi = {
 
 export const paymentsApi = {
   create: (payload) => api.post("/payments", payload),
+}
+
+export const automationApi = {
+  get: () => api.get("/automation"),
+  update: (payload) => api.put("/automation", payload),
+}
+
+export const notificationsApi = {
+  list: (params = {}) => api.get("/notifications", { params }),
+  markRead: (id) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch("/notifications/read-all"),
+  dismiss: (id) => api.patch(`/notifications/${id}/dismiss`),
 }

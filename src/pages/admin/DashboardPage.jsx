@@ -21,9 +21,11 @@ import {
   Package,
   ShieldCheck,
   Sparkles,
+  Bell,
+  Mail,
 } from "lucide-react"
-import { customersApi, getApiErrorMessage, licensesApi, productsApi } from "@/lib/api"
-import { formatDate, getLicenseStatus } from "@/lib/formatters"
+import { customersApi, getApiErrorMessage, licensesApi, notificationsApi, productsApi } from "@/lib/api"
+import { formatDate, formatDateTime, getLicenseStatus } from "@/lib/formatters"
 import {
   LineChart,
   Line,
@@ -55,6 +57,37 @@ const distributionConfig = [
 const monthLabelFormatter = new Intl.DateTimeFormat("en-US", { month: "short" })
 
 const getInitial = (value) => (value?.trim()?.charAt(0) || "?").toUpperCase()
+
+const isCustomerActive = (customer) => {
+  return customer?.is_active === true || customer?.is_active === "true" || Boolean(customer?.email_verified_at)
+}
+
+const getEmailStatusClassName = (status) => {
+  if (status === "sent") {
+    return "bg-success/10 text-success border-success/30"
+  }
+
+  if (status === "failed") {
+    return "bg-destructive/10 text-destructive border-destructive/30"
+  }
+
+  if (status === "dry_run" || status === "disabled" || status === "skipped") {
+    return "bg-muted text-muted-foreground border-muted"
+  }
+
+  return "bg-warning/10 text-warning border-warning/30"
+}
+
+const getNotificationEventLabel = (event) => {
+  const labels = {
+    license_created: "License created",
+    license_renewed: "License renewed",
+    license_expiration_reminder: "Expiration reminder",
+    license_expired: "License expired",
+  }
+
+  return labels[event] || "Notification"
+}
 
 const getDateKey = (value) => {
   if (!value) {
@@ -112,12 +145,18 @@ function EmptyPanel({ icon: Icon, title, description }) {
   )
 }
 
-function OverviewPanel({ activeRate, renewalRiskCount, customerCoverage, totalProducts }) {
+function OverviewPanel({
+  activeRate,
+  renewalRiskCount,
+  activationRate,
+  scheduledNotifications,
+  totalProducts,
+}) {
   const indicators = [
     { label: "Active rate", value: `${activeRate}%`, icon: ShieldCheck, tone: "text-success" },
     { label: "Renewal risk", value: renewalRiskCount, icon: AlertTriangle, tone: "text-warning" },
-    { label: "Customer coverage", value: `${customerCoverage}%`, icon: Users, tone: "text-accent" },
-    { label: "Products", value: totalProducts, icon: Package, tone: "text-primary" },
+    { label: "Activation rate", value: `${activationRate}%`, icon: Users, tone: "text-accent" },
+    { label: "Mail queue", value: scheduledNotifications, icon: Bell, tone: "text-primary" },
   ]
 
   return (
@@ -134,9 +173,9 @@ function OverviewPanel({ activeRate, renewalRiskCount, customerCoverage, totalPr
             </div>
 
             <div className="mt-4 max-w-2xl">
-              <h2 className="text-2xl font-bold tracking-normal text-foreground">License operations overview</h2>
+              <h2 className="text-2xl font-bold tracking-normal text-foreground">License and account operations</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Monitor license health, renewal pressure, customer coverage, and product usage from one workspace.
+                Monitor license health, renewal pressure, account activation, and email automation from one workspace.
               </p>
             </div>
 
@@ -148,9 +187,9 @@ function OverviewPanel({ activeRate, renewalRiskCount, customerCoverage, totalPr
                 </Link>
               </Button>
               <Button asChild variant="outline" className="border-border bg-transparent">
-                <Link to="/admin/licenses">
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Review Renewals
+                <Link to="/admin/notifications">
+                  <Bell className="mr-2 h-4 w-4" />
+                  Review Notifications
                 </Link>
               </Button>
             </div>
@@ -170,6 +209,9 @@ function OverviewPanel({ activeRate, renewalRiskCount, customerCoverage, totalPr
                 </div>
               )
             })}
+            <div className="col-span-2 bg-card/70 px-5 py-3 text-xs text-muted-foreground">
+              {totalProducts} product{totalProducts === 1 ? "" : "s"} monitored by the licensing workspace.
+            </div>
           </div>
         </div>
       </CardContent>
@@ -181,6 +223,8 @@ export default function DashboardPage() {
   const [customers, setCustomers] = useState([])
   const [licenses, setLicenses] = useState([])
   const [products, setProducts] = useState([])
+  const [notifications, setNotifications] = useState([])
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -189,14 +233,17 @@ export default function DashboardPage() {
     setError(null)
 
     try {
-      const [customersResponse, licensesResponse, productsResponse] = await Promise.all([
+      const [customersResponse, licensesResponse, productsResponse, notificationsResponse] = await Promise.all([
         customersApi.list(),
         licensesApi.list(),
         productsApi.list(),
+        notificationsApi.list({ limit: 100, include_scheduled: true }),
       ])
       setCustomers(customersResponse.data)
       setLicenses(licensesResponse.data)
       setProducts(productsResponse.data)
+      setNotifications(notificationsResponse.data.notifications || [])
+      setUnreadNotifications(notificationsResponse.data.unread_count || 0)
     } catch (err) {
       setError(getApiErrorMessage(err, "Failed to load dashboard data"))
     } finally {
@@ -227,8 +274,40 @@ export default function DashboardPage() {
   const expiringLicenses = licenseStats.expiring || 0
   const renewalRiskCount = expiredLicenses + expiringLicenses
   const customersWithLicenses = customers.filter((customer) => Number(customer.license_count || 0) > 0).length
+  const activeCustomers = customers.filter(isCustomerActive).length
+  const pendingActivationCustomers = Math.max(totalCustomers - activeCustomers, 0)
   const activeRate = totalLicenses ? Math.round((activeLicenses / totalLicenses) * 100) : 0
   const customerCoverage = totalCustomers ? Math.round((customersWithLicenses / totalCustomers) * 100) : 0
+  const activationRate = totalCustomers ? Math.round((activeCustomers / totalCustomers) * 100) : 0
+
+  const notificationStats = useMemo(() => {
+    const emailNotifications = notifications.filter((notification) => notification.email_to || notification.email_status)
+    const sentEmails = emailNotifications.filter((notification) => notification.email_status === "sent").length
+    const failedEmails = emailNotifications.filter(
+      (notification) => notification.email_status === "failed" || Boolean(notification.email_error),
+    ).length
+    const pendingEmails = emailNotifications.filter((notification) => notification.email_status === "pending").length
+    const scheduledNotifications = notifications.filter((notification) => notification.status === "scheduled")
+    const scheduledReminders = scheduledNotifications.filter((notification) =>
+      ["license_expiration_reminder", "license_expired"].includes(notification.event),
+    ).length
+    const dueScheduled = scheduledNotifications.filter((notification) => {
+      const scheduledTime = new Date(notification.scheduled_for || 0).getTime()
+
+      return scheduledTime > 0 && scheduledTime <= Date.now()
+    }).length
+    const completedEmailAttempts = sentEmails + failedEmails
+    const deliveryRate = completedEmailAttempts ? Math.round((sentEmails / completedEmailAttempts) * 100) : 100
+
+    return {
+      sentEmails,
+      failedEmails,
+      pendingEmails,
+      scheduledReminders,
+      dueScheduled,
+      deliveryRate,
+    }
+  }, [notifications])
 
   const licenseDistribution = useMemo(
     () =>
@@ -283,10 +362,34 @@ export default function DashboardPage() {
         name: customer.username || "Unnamed customer",
         email: customer.email,
         licenses: Number(customer.license_count || 0),
-        status: Number(customer.license_count || 0) > 0 ? "valid" : "trial",
+        active: isCustomerActive(customer),
         lastActivity: formatDate(customer.created_at, "Recently"),
       }))
   }, [customers])
+
+  const pendingActivationQueue = useMemo(() => {
+    return customers
+      .filter((customer) => !isCustomerActive(customer))
+      .sort((a, b) => {
+        const dateA = new Date(a.activation_sent_at || a.created_at || 0).getTime()
+        const dateB = new Date(b.activation_sent_at || b.created_at || 0).getTime()
+
+        return dateB - dateA
+      })
+      .slice(0, 4)
+  }, [customers])
+
+  const latestEmailEvents = useMemo(() => {
+    return notifications
+      .filter((notification) => notification.email_to || notification.email_status)
+      .sort((a, b) => {
+        const dateA = new Date(a.email_sent_at || a.scheduled_for || a.sent_at || a.created_at || 0).getTime()
+        const dateB = new Date(b.email_sent_at || b.scheduled_for || b.sent_at || b.created_at || 0).getTime()
+
+        return dateB - dateA
+      })
+      .slice(0, 4)
+  }, [notifications])
 
   const renewalQueue = useMemo(() => {
     return licenses
@@ -337,12 +440,20 @@ export default function DashboardPage() {
       href: "/admin/licenses",
     },
     {
-      title: "Unlicensed customers",
-      value: totalCustomers - customersWithLicenses,
-      description: "Customers without an attached license.",
+      title: "Pending activation",
+      value: pendingActivationCustomers,
+      description: "Accounts waiting for email confirmation.",
       icon: Users,
       tone: "text-primary",
       href: "/admin/customers",
+    },
+    {
+      title: "Email delivery issues",
+      value: notificationStats.failedEmails,
+      description: "Notification emails that failed delivery.",
+      icon: Mail,
+      tone: "text-destructive",
+      href: "/admin/notifications",
     },
   ]
 
@@ -360,7 +471,8 @@ export default function DashboardPage() {
         <OverviewPanel
           activeRate={activeRate}
           renewalRiskCount={renewalRiskCount}
-          customerCoverage={customerCoverage}
+          activationRate={activationRate}
+          scheduledNotifications={notificationStats.scheduledReminders}
           totalProducts={totalProducts}
         />
 
@@ -397,6 +509,173 @@ export default function DashboardPage() {
             icon={RefreshCw}
             iconColor="text-warning"
           />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            title="Activated Accounts"
+            value={activeCustomers}
+            change={`${activationRate}% activation rate`}
+            changeType={pendingActivationCustomers > 0 ? "neutral" : "positive"}
+            icon={ShieldCheck}
+            iconColor="text-success"
+          />
+          <StatsCard
+            title="Pending Activation"
+            value={pendingActivationCustomers}
+            change="Waiting for email confirmation"
+            changeType={pendingActivationCustomers > 0 ? "negative" : "positive"}
+            icon={Users}
+            iconColor={pendingActivationCustomers > 0 ? "text-warning" : "text-success"}
+          />
+          <StatsCard
+            title="Reminder Queue"
+            value={notificationStats.scheduledReminders}
+            change={
+              notificationStats.dueScheduled > 0
+                ? `${notificationStats.dueScheduled} due now`
+                : `${notificationStats.pendingEmails} pending email(s)`
+            }
+            changeType={notificationStats.dueScheduled > 0 ? "negative" : "neutral"}
+            icon={Bell}
+            iconColor="text-primary"
+          />
+          <StatsCard
+            title="Email Delivery"
+            value={`${notificationStats.deliveryRate}%`}
+            change={`${notificationStats.sentEmails} sent / ${notificationStats.failedEmails} failed`}
+            changeType={notificationStats.failedEmails > 0 ? "negative" : "positive"}
+            icon={Mail}
+            iconColor={notificationStats.failedEmails > 0 ? "text-destructive" : "text-success"}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <Card className="glass border-border">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-success" />
+                Account Activation
+              </CardTitle>
+              <Badge className="bg-primary/10 text-primary border-primary/30">{customerCoverage}% licensed</Badge>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-border bg-secondary/25 p-4">
+                  <p className="text-2xl font-bold text-foreground">{activeCustomers}</p>
+                  <p className="mt-1 text-xs uppercase tracking-normal text-muted-foreground">Activated</p>
+                </div>
+                <div className="rounded-lg border border-border bg-secondary/25 p-4">
+                  <p className="text-2xl font-bold text-foreground">{pendingActivationCustomers}</p>
+                  <p className="mt-1 text-xs uppercase tracking-normal text-muted-foreground">Pending</p>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {pendingActivationQueue.length > 0 ? (
+                  pendingActivationQueue.map((customer) => (
+                    <Link
+                      key={customer.id}
+                      to={`/admin/customers/${customer.id}`}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-secondary/25 p-3 transition-colors hover:bg-secondary/45"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {customer.username || "Unnamed customer"}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">{customer.email}</p>
+                      </div>
+                      <Badge className="shrink-0 bg-warning/10 text-warning border-warning/30">Pending</Badge>
+                    </Link>
+                  ))
+                ) : (
+                  <EmptyPanel
+                    icon={CheckCircle2}
+                    title="All accounts active"
+                    description="Pending email confirmations will appear here after new customer registration."
+                  />
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass border-border xl:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <Mail className="w-5 h-5 text-primary" />
+                Email Automation Health
+              </CardTitle>
+              <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
+                <Link to="/admin/notifications">
+                  Open Center
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="rounded-lg border border-border bg-secondary/25 p-4">
+                  <p className="text-2xl font-bold text-foreground">{notificationStats.sentEmails}</p>
+                  <p className="mt-1 text-xs uppercase tracking-normal text-muted-foreground">Sent</p>
+                </div>
+                <div className="rounded-lg border border-border bg-secondary/25 p-4">
+                  <p className="text-2xl font-bold text-foreground">{notificationStats.pendingEmails}</p>
+                  <p className="mt-1 text-xs uppercase tracking-normal text-muted-foreground">Pending</p>
+                </div>
+                <div className="rounded-lg border border-border bg-secondary/25 p-4">
+                  <p className="text-2xl font-bold text-foreground">{notificationStats.scheduledReminders}</p>
+                  <p className="mt-1 text-xs uppercase tracking-normal text-muted-foreground">Scheduled</p>
+                </div>
+                <div className="rounded-lg border border-border bg-secondary/25 p-4">
+                  <p className="text-2xl font-bold text-foreground">{unreadNotifications}</p>
+                  <p className="mt-1 text-xs uppercase tracking-normal text-muted-foreground">Unread</p>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {latestEmailEvents.length > 0 ? (
+                  latestEmailEvents.map((notification) => (
+                    <Link
+                      key={notification.id}
+                      to={notification.license_id ? `/admin/licenses/${notification.license_id}` : "/admin/notifications"}
+                      className="grid gap-3 rounded-lg border border-border bg-secondary/25 p-3 transition-colors hover:bg-secondary/45 md:grid-cols-[1fr_auto]"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {getNotificationEventLabel(notification.event)}
+                          </p>
+                          <Badge className={getEmailStatusClassName(notification.email_status)}>
+                            {notification.email_status || "pending"}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {[notification.customer_username, notification.product_name].filter(Boolean).join(" - ") ||
+                            notification.email_to ||
+                            "Email notification"}
+                        </p>
+                      </div>
+                      <p className="text-left text-xs text-muted-foreground md:text-right">
+                        {formatDateTime(
+                          notification.email_sent_at ||
+                            notification.scheduled_for ||
+                            notification.sent_at ||
+                            notification.created_at,
+                          "Pending",
+                        )}
+                      </p>
+                    </Link>
+                  ))
+                ) : (
+                  <EmptyPanel
+                    icon={Mail}
+                    title="No email activity yet"
+                    description="License purchase, renewal, reminder, and expiration emails will appear here."
+                  />
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -535,7 +814,18 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-4">
-                        <StatusBadge status={customer.status} />
+                        <Badge
+                          className={
+                            customer.active
+                              ? "bg-success/10 text-success border-success/30"
+                              : "bg-warning/10 text-warning border-warning/30"
+                          }
+                        >
+                          {customer.active ? "Active" : "Pending"}
+                        </Badge>
+                        <span className="hidden text-xs text-muted-foreground md:block">
+                          {customer.licenses} license{customer.licenses === 1 ? "" : "s"}
+                        </span>
                         <span className="hidden text-xs text-muted-foreground md:block">{customer.lastActivity}</span>
                       </div>
                     </Link>
@@ -572,7 +862,7 @@ export default function DashboardPage() {
               >
                 <Link to="/register">
                   <Users className="w-4 h-4" />
-                  Add Customer
+                  Register Customer
                 </Link>
               </Button>
               <Button
@@ -591,8 +881,18 @@ export default function DashboardPage() {
                 className="w-full justify-start gap-3 border-border hover:bg-secondary bg-transparent"
               >
                 <Link to="/admin/notifications">
-                  <AlertTriangle className="w-4 h-4" />
-                  View Alerts
+                  <Bell className="w-4 h-4" />
+                  Notification Center
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="w-full justify-start gap-3 border-border hover:bg-secondary bg-transparent"
+              >
+                <Link to="/admin/automation">
+                  <Mail className="w-4 h-4" />
+                  Email Automation
                 </Link>
               </Button>
             </CardContent>
@@ -693,7 +993,7 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {alertItems.map((item) => {
             const Icon = item.icon
 

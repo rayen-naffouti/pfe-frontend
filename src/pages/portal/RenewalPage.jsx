@@ -34,9 +34,10 @@ import {
   Server,
   Shield,
   Star,
+  Timer,
 } from "lucide-react"
 import { customersApi, getApiErrorMessage, licensesApi, productsApi } from "@/lib/api"
-import { formatDate, getLicenseStatus } from "@/lib/formatters"
+import { formatDate, formatDateTime, getLicenseStatus } from "@/lib/formatters"
 import apiShapeImage from "./images/apiShape.png"
 import dataShapeImage from "./images/dataShape.png"
 import vectorDbShapeImage from "./images/vectorDbShape.png"
@@ -60,6 +61,12 @@ const plans = [
     name: "Custom Modules",
     price: 0,
     features: ["Choose modules", "Custom usage limits", "Infrastructure sizing", "Pay only for selected capacity"],
+  },
+  {
+    id: "test",
+    name: "Test Plan",
+    price: 1,
+    features: ["15-minute license", "Reminder at 5 minutes remaining", "Expiration notification and email"],
   },
 ]
 
@@ -622,6 +629,7 @@ export default function RenewalPage() {
   const [submitting, setSubmitting] = useState(false)
   const [createdLicense, setCreatedLicense] = useState(null)
   const [recordedPayment, setRecordedPayment] = useState(null)
+  const [createdNotifications, setCreatedNotifications] = useState(null)
   const [selectedProductId, setSelectedProductId] = useState(null)
   const [selectedModules, setSelectedModules] = useState(["cortexflow"])
   const [selectedSubModules, setSelectedSubModules] = useState({
@@ -638,6 +646,8 @@ export default function RenewalPage() {
   const plan = plans.find((p) => p.id === selectedPlan)
   const duration = durations.find((d) => d.id === selectedDuration)
   const isCustomPlan = selectedPlan === "custom"
+  const isTestPlan = selectedPlan === "test"
+  const planDuration = isTestPlan ? { id: "15m", label: "15 Minutes", multiplier: 1 } : duration
   const selectedModuleItems = moduleCatalog.filter((module) => selectedModules.includes(module.id))
   const getSelectedSubModuleItems = (module) =>
     module.submodules.filter((subModule) => selectedSubModules[module.id]?.includes(subModule.id))
@@ -657,7 +667,7 @@ export default function RenewalPage() {
     teamSeats[0] * 18 +
     environments[0] * 120
   const yearlyBasePrice = isCustomPlan ? moduleSubtotal + infraSubtotal : plan.price
-  const totalPrice = yearlyBasePrice * duration.multiplier
+  const totalPrice = yearlyBasePrice * planDuration.multiplier
   const selectedProduct = products.find((product) => Number(product.id) === Number(selectedProductId))
   const selectedExistingLicense =
     licenses.find((license) => Number(license.product_id) === Number(selectedProductId)) || null
@@ -713,6 +723,10 @@ export default function RenewalPage() {
   }
 
   const getExpirationAt = () => {
+    if (isTestPlan) {
+      return new Date(Date.now() + 15 * 60_000).toISOString()
+    }
+
     const currentExpiration = selectedExistingLicense?.expiration_at ? new Date(selectedExistingLicense.expiration_at) : null
     const now = new Date()
     const baseDate =
@@ -856,7 +870,7 @@ export default function RenewalPage() {
         payment_status: "paid",
         license_status: "valid",
         plan_name: plan.name,
-        duration_label: duration.label,
+        duration_label: planDuration.label,
         purchase_summary: getPurchaseSummary(),
         features: getLicenseFeatures(),
       }
@@ -877,6 +891,7 @@ export default function RenewalPage() {
 
       setCreatedLicense(normalizedLicense)
       setRecordedPayment(data.payment)
+      setCreatedNotifications(data.notifications || null)
       setLicenses((current) => [normalizedLicense, ...current.filter((license) => license.id !== normalizedLicense.id)])
       setStep(3)
     } catch (err) {
@@ -1041,7 +1056,7 @@ export default function RenewalPage() {
               </Card>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
               {plans.map((p) => (
                 <Card
                   key={p.id}
@@ -1077,6 +1092,11 @@ export default function RenewalPage() {
                         <>
                           <span className="text-3xl font-bold text-foreground">Build</span>
                           <span className="text-muted-foreground"> your plan</span>
+                        </>
+                      ) : p.id === "test" ? (
+                        <>
+                          <span className="text-3xl font-bold text-foreground">${p.price}</span>
+                          <span className="text-muted-foreground">/test</span>
                         </>
                       ) : (
                         <>
@@ -1332,27 +1352,37 @@ export default function RenewalPage() {
                 <CardTitle className="text-foreground">Select Duration</CardTitle>
               </CardHeader>
               <CardContent>
-                <RadioGroup
-                  value={selectedDuration}
-                  onValueChange={setSelectedDuration}
-                  className="grid grid-cols-3 gap-4"
-                >
-                  {durations.map((d) => (
-                    <Label
-                      key={d.id}
-                      className={cn(
-                        "flex flex-col items-center p-4 rounded-lg border cursor-pointer transition-all",
-                        selectedDuration === d.id
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:bg-secondary/50",
-                      )}
-                    >
-                      <RadioGroupItem value={d.id} className="sr-only" />
-                      <span className="font-semibold text-foreground">{d.label}</span>
-                      {d.discount && <span className="text-xs text-success mt-1">{d.discount}</span>}
-                    </Label>
-                  ))}
-                </RadioGroup>
+                {isTestPlan ? (
+                  <div className="flex items-center justify-center gap-3 rounded-lg border border-warning/40 bg-warning/10 p-4">
+                    <Timer className="h-5 w-5 text-warning" />
+                    <div>
+                      <p className="font-semibold text-foreground">15 Minutes</p>
+                      <p className="text-xs text-muted-foreground">Reminder at 5 minutes remaining, then expiration alert</p>
+                    </div>
+                  </div>
+                ) : (
+                  <RadioGroup
+                    value={selectedDuration}
+                    onValueChange={setSelectedDuration}
+                    className="grid grid-cols-3 gap-4"
+                  >
+                    {durations.map((d) => (
+                      <Label
+                        key={d.id}
+                        className={cn(
+                          "flex flex-col items-center p-4 rounded-lg border cursor-pointer transition-all",
+                          selectedDuration === d.id
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:bg-secondary/50",
+                        )}
+                      >
+                        <RadioGroupItem value={d.id} className="sr-only" />
+                        <span className="font-semibold text-foreground">{d.label}</span>
+                        {d.discount && <span className="text-xs text-success mt-1">{d.discount}</span>}
+                      </Label>
+                    ))}
+                  </RadioGroup>
+                )}
               </CardContent>
             </Card>
 
@@ -1469,12 +1499,12 @@ export default function RenewalPage() {
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Duration</span>
-                    <span className="text-foreground">{duration.label}</span>
+                    <span className="text-foreground">{planDuration.label}</span>
                   </div>
-                  {duration.discount && (
+                  {planDuration.discount && (
                     <div className="flex justify-between text-success">
                       <span>Discount</span>
-                      <span>-{duration.discount}</span>
+                      <span>-{planDuration.discount}</span>
                     </div>
                   )}
                   <div className="pt-4 border-t border-border">
@@ -1552,7 +1582,7 @@ export default function RenewalPage() {
                 )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Duration</span>
-                  <span className="text-foreground font-medium">{duration.label}</span>
+                  <span className="text-foreground font-medium">{planDuration.label}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Amount Paid</span>
@@ -1561,7 +1591,11 @@ export default function RenewalPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">New Expiry</span>
                   <span className="text-foreground font-medium">
-                    {createdLicense?.expiration_at ? formatDate(createdLicense.expiration_at) : "Pending"}
+                    {createdLicense?.expiration_at
+                      ? isTestPlan
+                        ? formatDateTime(createdLicense.expiration_at)
+                        : formatDate(createdLicense.expiration_at)
+                      : "Pending"}
                   </span>
                 </div>
                 <div className="space-y-2 rounded-lg bg-secondary/30 border border-border p-3 text-left">
@@ -1573,7 +1607,15 @@ export default function RenewalPage() {
 
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <Shield className="w-4 h-4" />
-              <span>A receipt has been sent to your email</span>
+              <span>
+                A portal notification was sent with this key
+                {createdNotifications?.emailDelivery?.status === "sent" ? " and an email was delivered" : ""}
+                {isTestPlan && createdNotifications?.reminderNotifications?.length
+                  ? "; the 5-minute reminder and expiration alert were scheduled"
+                  : createdNotifications?.reminderNotifications?.length
+                  ? ` and ${createdNotifications.reminderNotifications.length} reminder${createdNotifications.reminderNotifications.length === 1 ? "" : "s"} were scheduled`
+                  : ""}
+              </span>
             </div>
 
             <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground glow-blue">

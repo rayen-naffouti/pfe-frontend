@@ -7,6 +7,15 @@ import { ThemeToggle } from "@/components/ThemeToggle"
 import { LicenseKeyField } from "@/components/LicenseKeyField"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
 import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
 import {
@@ -24,9 +33,10 @@ import {
   ShoppingCart,
   LayoutDashboard,
 } from "lucide-react"
-import { customersApi, getApiErrorMessage, productsApi } from "@/lib/api"
+import { customersApi, getApiErrorMessage, notificationsApi, productsApi } from "@/lib/api"
 import { clearAuthSession, getAuthRole } from "@/lib/auth"
 import { formatCurrency, formatDate, getLicenseStatus } from "@/lib/formatters"
+import { formatNotificationTime, getNotificationPollInterval, isNotificationUnread } from "@/lib/notifications"
 
 const STANDARD_PLAN_START_PRICE = 999
 
@@ -34,6 +44,8 @@ export default function PortalPage() {
   const [customer, setCustomer] = useState(null)
   const [licenses, setLicenses] = useState([])
   const [products, setProducts] = useState([])
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -60,6 +72,24 @@ export default function PortalPage() {
 
   useEffect(() => {
     fetchPortal()
+  }, [])
+
+  const fetchNotifications = async () => {
+    try {
+      const { data } = await notificationsApi.list({ limit: 5, scope: "mine" })
+      setNotifications(data.notifications || [])
+      setUnreadCount(data.unread_count || 0)
+    } catch {
+      setNotifications([])
+      setUnreadCount(0)
+    }
+  }
+
+  useEffect(() => {
+    fetchNotifications()
+    const timer = window.setInterval(fetchNotifications, getNotificationPollInterval())
+
+    return () => window.clearInterval(timer)
   }, [])
 
   const primaryLicense = licenses[0]
@@ -92,6 +122,20 @@ export default function PortalPage() {
     clearAuthSession()
   }
 
+  const handleNotificationClick = async (notification) => {
+    if (!isNotificationUnread(notification)) {
+      return
+    }
+
+    notificationsApi.markRead(notification.id).catch(() => {})
+    setUnreadCount((current) => Math.max(current - 1, 0))
+    setNotifications((current) =>
+      current.map((item) =>
+        item.id === notification.id ? { ...item, read_at: item.read_at || new Date().toISOString() } : item,
+      ),
+    )
+  }
+
   return (
     <div className="min-h-screen relative">
       <ParticlesBackground />
@@ -116,9 +160,41 @@ export default function PortalPage() {
               </Button>
             )}
             <ThemeToggle />
-            <Button variant="ghost" size="icon">
-              <Bell className="w-5 h-5" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 min-w-5 h-5 px-1 flex items-center justify-center bg-destructive text-destructive-foreground text-xs">
+                      {Math.min(unreadCount, 99)}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80 glass-strong border-border">
+                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {notifications.length === 0 ? (
+                  <DropdownMenuItem disabled className="py-3 text-muted-foreground">
+                    No notifications
+                  </DropdownMenuItem>
+                ) : (
+                  notifications.map((notification) => (
+                    <DropdownMenuItem
+                      key={notification.id}
+                      className="flex flex-col items-start gap-1 py-3"
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      <span className={isNotificationUnread(notification) ? "font-semibold" : "font-medium"}>
+                        {notification.title}
+                      </span>
+                      <span className="line-clamp-2 text-xs text-muted-foreground">{notification.message}</span>
+                      <span className="text-xs text-muted-foreground">{formatNotificationTime(notification)}</span>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="ghost" size="icon">
               <User className="w-5 h-5" />
             </Button>

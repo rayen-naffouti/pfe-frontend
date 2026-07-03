@@ -18,6 +18,9 @@ import ProtectedRoute, { PublicOnlyRoute } from "../components/ProtectedRout"
 import RegisterPage from "../pages/RegisterPage"
 import ProductsPage from "../pages/admin/ProductsPage"
 import ProductDetailPage from "../pages/admin/ProductDetailPage"
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage"
+import ResetPasswordPage from "@/pages/ResetPasswordPage"
+import ActivateAccountPage from "@/pages/ActivateAccountPage"
 
 export default function AppRoutes() {
   return (
@@ -28,7 +31,11 @@ export default function AppRoutes() {
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       </Route>
+
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/activate-account" element={<ActivateAccountPage />} />
 
       <Route element={<ProtectedRoute requireAdmin />}>
         <Route path="/admin" element={<AdminLayout />}>

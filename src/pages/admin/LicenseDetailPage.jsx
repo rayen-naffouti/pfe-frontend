@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom"
 import { AdminHeader } from "@/components/AdminHeader"
 import { StatusBadge } from "@/components/StatusBadge"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
@@ -26,6 +27,8 @@ import {
   AlertTriangle,
   ListChecks,
   Server,
+  Bell,
+  Mail,
 } from "lucide-react"
 
 const decodeBase64UrlJson = (value) => {
@@ -75,6 +78,108 @@ const formatNumber = (value) => {
   }
 
   return numericValue.toLocaleString()
+}
+
+const getTimelineCategory = (log) => {
+  if (log.source === "notification" && log.event === "license_expiration_reminder") {
+    return "Reminder"
+  }
+
+  if (log.source === "notification" && log.event === "license_expired") {
+    return "Expiration email"
+  }
+
+  if (log.source === "expiration") {
+    return "Expiration"
+  }
+
+  return "History"
+}
+
+const getTimelineBadgeClassName = (log) => {
+  if (log.type === "error" || log.email_status === "failed") {
+    return "bg-destructive/10 text-destructive border-destructive/30"
+  }
+
+  if (log.type === "warning" || log.status === "scheduled") {
+    return "bg-warning/10 text-warning border-warning/30"
+  }
+
+  if (log.type === "success" || log.status === "sent") {
+    return "bg-success/10 text-success border-success/30"
+  }
+
+  return "bg-primary/10 text-primary border-primary/30"
+}
+
+const getEmailStatusClassName = (status) => {
+  if (status === "sent") {
+    return "bg-success/10 text-success border-success/30"
+  }
+
+  if (status === "failed") {
+    return "bg-destructive/10 text-destructive border-destructive/30"
+  }
+
+  if (status === "pending") {
+    return "bg-warning/10 text-warning border-warning/30"
+  }
+
+  return "bg-muted text-muted-foreground border-muted"
+}
+
+const getTimelineDotClassName = (log) => {
+  if (log.type === "error" || log.email_status === "failed") {
+    return "bg-destructive"
+  }
+
+  if (log.type === "warning" || log.status === "scheduled") {
+    return "bg-warning"
+  }
+
+  if (log.type === "success" || log.status === "sent") {
+    return "bg-success"
+  }
+
+  return "bg-primary"
+}
+
+const getTimelineIcon = (log) => {
+  if (log.source === "notification") {
+    return Mail
+  }
+
+  if (log.source === "expiration") {
+    return Bell
+  }
+
+  return Activity
+}
+
+const getLogLine = (log) => {
+  const parts = [log.action]
+
+  if (log.source !== "history") {
+    parts.push(getTimelineCategory(log))
+  }
+
+  if (log.status) {
+    parts.push(`status: ${log.status}`)
+  }
+
+  if (log.email_status) {
+    parts.push(`email: ${log.email_status}`)
+  }
+
+  if (log.scheduled_for) {
+    parts.push(`scheduled: ${formatDateTime(log.scheduled_for)}`)
+  }
+
+  if (log.note) {
+    parts.push(log.note)
+  }
+
+  return parts.filter(Boolean).join(" - ")
 }
 
 export default function LicenseDetailPage() {
@@ -452,24 +557,78 @@ export default function LicenseDetailPage() {
                   <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
                   <div className="space-y-6">
                     {history.length === 0 && (
-                      <p className="text-sm text-muted-foreground pl-10">No history entries yet.</p>
+                      <p className="text-sm text-muted-foreground pl-10">No history, reminder, or expiration entries yet.</p>
                     )}
-                    {history.map((log) => (
-                      <div key={log.id} className="relative pl-10">
-                        <div className="absolute left-2.5 w-3 h-3 rounded-full bg-primary ring-4 ring-background" />
-                        <div className="p-4 rounded-lg bg-secondary/30 border border-border">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-foreground">{log.action}</span>
-                            <span className="text-xs text-muted-foreground">{formatDateTime(log.created_at)}</span>
-                          </div>
-                          <div className="flex gap-4 text-sm text-muted-foreground">
-                            {log.old_status && <span>From: {log.old_status}</span>}
-                            {log.new_status && <span>To: {log.new_status}</span>}
-                            {log.note && <span>{log.note}</span>}
+                    {history.map((log) => {
+                      const TimelineIcon = getTimelineIcon(log)
+
+                      return (
+                        <div key={log.timeline_id || log.id} className="relative pl-10">
+                          <div
+                            className={`absolute left-2.5 flex h-3 w-3 items-center justify-center rounded-full ${getTimelineDotClassName(log)} ring-4 ring-background`}
+                          />
+                          <div className="rounded-lg border border-border bg-secondary/30 p-4">
+                            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <TimelineIcon className="h-4 w-4 shrink-0 text-primary" />
+                                  <span className="font-medium text-foreground">{log.action}</span>
+                                  <Badge className={getTimelineBadgeClassName(log)}>{getTimelineCategory(log)}</Badge>
+                                  {log.status && (
+                                    <Badge className={getTimelineBadgeClassName(log)}>{log.status}</Badge>
+                                  )}
+                                </div>
+                                {log.note && (
+                                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{log.note}</p>
+                                )}
+                              </div>
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                {formatDateTime(log.created_at)}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                              {log.old_status && (
+                                <span className="rounded-md border border-border bg-background/40 px-2 py-1">
+                                  From: {log.old_status}
+                                </span>
+                              )}
+                              {log.new_status && (
+                                <span className="rounded-md border border-border bg-background/40 px-2 py-1">
+                                  To: {log.new_status}
+                                </span>
+                              )}
+                              {log.scheduled_for && (
+                                <span className="rounded-md border border-border bg-background/40 px-2 py-1">
+                                  Scheduled: {formatDateTime(log.scheduled_for)}
+                                </span>
+                              )}
+                              {log.email_sent_at && (
+                                <span className="rounded-md border border-border bg-background/40 px-2 py-1">
+                                  Email sent: {formatDateTime(log.email_sent_at)}
+                                </span>
+                              )}
+                              {log.email_status && (
+                                <Badge className={getEmailStatusClassName(log.email_status)}>
+                                  Email: {log.email_status}
+                                </Badge>
+                              )}
+                              {log.email_to && (
+                                <span className="rounded-md border border-border bg-background/40 px-2 py-1">
+                                  To: {log.email_to}
+                                </span>
+                              )}
+                            </div>
+
+                            {log.email_error && (
+                              <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                                {log.email_error}
+                              </p>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               </CardContent>
@@ -500,11 +659,10 @@ export default function LicenseDetailPage() {
                 </AccordionTrigger>
                 <AccordionContent>
                   <div className="p-4 rounded-lg bg-secondary/30 border border-border font-mono text-sm text-muted-foreground">
-                    {history.length === 0 && <p>No verification or history logs available.</p>}
+                    {history.length === 0 && <p>No verification, reminder, expiration, or history logs available.</p>}
                     {history.map((log) => (
-                      <p key={log.id}>
-                        [{formatDateTime(log.created_at)}] {log.action}
-                        {log.note ? ` - ${log.note}` : ""}
+                      <p key={log.timeline_id || log.id}>
+                        [{formatDateTime(log.created_at)}] {getLogLine(log)}
                       </p>
                     ))}
                   </div>

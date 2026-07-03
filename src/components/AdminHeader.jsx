@@ -13,13 +13,16 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/ThemeToggle"
-import { authApi } from "@/lib/api"
+import { authApi, notificationsApi } from "@/lib/api"
 import { clearAuthSession } from "@/lib/auth"
+import { formatNotificationTime, getNotificationPollInterval, isNotificationUnread } from "@/lib/notifications"
 
 export function AdminHeader({ title, subtitle }) {
   const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
   const [profileError, setProfileError] = useState(null)
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
     const token = localStorage.getItem("token")
@@ -39,9 +42,47 @@ export function AdminHeader({ title, subtitle }) {
       })
   }, [])
 
+  const fetchNotifications = async () => {
+    try {
+      const { data } = await notificationsApi.list({ limit: 3 })
+      setNotifications(data.notifications || [])
+      setUnreadCount(data.unread_count || 0)
+    } catch {
+      setNotifications([])
+      setUnreadCount(0)
+    }
+  }
+
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+
+    if (!token) {
+      return undefined
+    }
+
+    fetchNotifications()
+    const timer = window.setInterval(fetchNotifications, getNotificationPollInterval())
+
+    return () => window.clearInterval(timer)
+  }, [])
+
   const handleLogout = () => {
     clearAuthSession()
     navigate("/login")
+  }
+
+  const handleNotificationClick = async (notification) => {
+    if (isNotificationUnread(notification)) {
+      notificationsApi.markRead(notification.id).catch(() => {})
+      setUnreadCount((current) => Math.max(current - 1, 0))
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notification.id ? { ...item, read_at: item.read_at || new Date().toISOString() } : item,
+        ),
+      )
+    }
+
+    navigate("/admin/notifications")
   }
 
   return (
@@ -64,26 +105,37 @@ export function AdminHeader({ title, subtitle }) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="w-5 h-5" />
-                <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center bg-destructive text-destructive-foreground text-xs">
-                  3
-                </Badge>
+                {unreadCount > 0 && (
+                  <Badge className="absolute -top-1 -right-1 min-w-5 h-5 px-1 flex items-center justify-center bg-destructive text-destructive-foreground text-xs">
+                    {Math.min(unreadCount, 99)}
+                  </Badge>
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80 glass-strong border-border">
               <DropdownMenuLabel>Notifications</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-                <span className="font-medium">License Expiring Soon</span>
-                <span className="text-xs text-muted-foreground">Acme Corp license expires in 3 days</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-                <span className="font-medium">New Customer</span>
-                <span className="text-xs text-muted-foreground">TechStart Inc. just registered</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-                <span className="font-medium">Renewal Completed</span>
-                <span className="text-xs text-muted-foreground">GlobalTech renewed for 1 year</span>
-              </DropdownMenuItem>
+              {notifications.length === 0 ? (
+                <DropdownMenuItem disabled className="py-3 text-muted-foreground">
+                  No notifications
+                </DropdownMenuItem>
+              ) : (
+                notifications.map((notification) => (
+                  <DropdownMenuItem
+                    key={notification.id}
+                    className="flex flex-col items-start gap-1 py-3"
+                    onClick={() => handleNotificationClick(notification)}
+                  >
+                    <span className={isNotificationUnread(notification) ? "font-semibold" : "font-medium"}>
+                      {notification.title}
+                    </span>
+                    <span className="line-clamp-2 text-xs text-muted-foreground">{notification.message}</span>
+                    <span className="text-xs text-muted-foreground">{formatNotificationTime(notification)}</span>
+                  </DropdownMenuItem>
+                ))
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/admin/notifications")}>View all notifications</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 

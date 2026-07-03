@@ -1,21 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { AdminHeader } from "@/components/AdminHeader"
 import { StatusBadge } from "@/components/StatusBadge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { EmptyState, ErrorState, LoadingState } from "@/components/DataState"
+import { getApiErrorMessage, productsApi } from "@/lib/api"
 import {
   Activity,
-  AlertTriangle,
   ArrowLeft,
   Bot,
   Clock,
   Code2,
   Cpu,
-  CreditCard,
   Database,
   ExternalLink,
   FileSearch,
@@ -49,17 +49,21 @@ import {
 
 const productProfile = {
   name: "Tenant Web Application",
-  tenantId: "tenant-prod-001",
-  hostBaseUrl: "https://app.tenant.example.com",
-  runtime: "React SPA, Node.js APIs, PostgreSQL, Redis, AI Diagnostics",
-  release: "v2.8.4",
+  tenantId: "Not assigned",
+  hostBaseUrl: "",
+  runtime: "Express Gateway, RBAC, PostgreSQL audit logs, Redis rate limiting",
+  release: "gateway",
 }
 
-const signalCards = [
-  { label: "API Requests", value: "41.2k", detail: "Last 24 hours", icon: Activity, tone: "text-primary" },
-  { label: "Error Rate", value: "0.82%", detail: "Target below 1%", icon: AlertTriangle, tone: "text-warning" },
-  { label: "AI Confidence", value: "87%", detail: "Root-cause prediction", icon: Bot, tone: "text-accent" },
-  { label: "Log Volume", value: "1.8M", detail: "Events indexed today", icon: Terminal, tone: "text-success" },
+const gatewayProxyRoutes = [
+  { id: "dispatcher", name: "Dispatcher", path: "/proxy/minotaur/dispatcher" },
+  { id: "extractor", name: "Extractor", path: "/proxy/minotaur/ext" },
+  { id: "decision-engine", name: "Decision Engine", path: "/proxy/minotaur/decision" },
+  { id: "sap-hyper-automation", name: "SAP Hyper Automation", path: "/proxy/minotaur/sapient" },
+  { id: "cortexflow", name: "Cortexflow", path: "/proxy/minotaur/cortexflow" },
+  { id: "notifications", name: "Notification Service", path: "/proxy/minotaur/notif" },
+  { id: "mca-core", name: "MCA Core API", path: "/proxy/minotaur/api" },
+  { id: "external-service", name: "External Service", path: "/proxy/external-service" },
 ]
 
 const trafficTrend = [
@@ -71,183 +75,175 @@ const trafficTrend = [
   { time: "20:00", requests: 1720, latency: 196, errors: 7 },
 ]
 
-const microservices = [
+const buildGatewayMicroservices = (product) => [
   {
     id: "gateway",
-    name: "API Gateway",
+    name: "GatewayRBAC",
     icon: Network,
     status: "valid",
-    runtime: "Nginx edge + Express middleware",
-    owner: "Platform Team",
-    health: "99.98%",
-    latency: "42 ms",
-    load: 64,
-    version: "v1.14.2",
-    responsibilities: ["CORS policy", "JWT forwarding", "Rate limiting", "Request id injection"],
-    dependencies: ["Auth Service", "License Service", "Billing Service"],
-    storage: ["Redis rate-limit cache"],
-    logs: ["gateway.route.matched", "cors.origin.accepted", "rate_limit.bucket.updated"],
-    aiNote: "Traffic is healthy. AI recommends adding per-tenant throttling before public API keys are introduced.",
-    risk: "A CORS misconfiguration could block the frontend while backend health stays green.",
+    runtime: normalizeGatewayBaseUrl(product.hostBaseUrl) || "Host Base URL not configured",
+    owner: "GatewayRBAC",
+    health: product.hostBaseUrl ? "Linked" : "Missing",
+    latency: "Edge",
+    load: 58,
+    version: "Express + TypeScript",
+    responsibilities: ["CORS policy", "JWT ACT validation", "License guard", "RBAC proxy routing"],
+    dependencies: ["PostgreSQL", "Redis", "License file", "Minotaur upstreams"],
+    storage: ["audit_logs", "users", "roles", "permissions", "redis rate-limit cache"],
+    logs: ["cors.origin.accepted", "license.validated", "audit-log.query", "proxy.route.matched"],
+    aiNote: "GatewayRBAC is the entry point. Product Host Base URL tells Licentra which deployed gateway to inspect.",
+    risk: "If the Host Base URL is wrong or the ACT token has no audit:read permission, live gateway logs cannot be displayed.",
   },
   {
-    id: "licenses",
-    name: "License Service",
-    icon: Key,
+    id: "cortexflow",
+    name: "Cortexflow",
+    icon: Cpu,
     status: "valid",
-    runtime: "Node.js service + HMAC signing",
-    owner: "Licensing Team",
-    health: "99.91%",
-    latency: "86 ms",
+    runtime: `${normalizeGatewayBaseUrl(product.hostBaseUrl) || "Gateway"}/proxy/minotaur/cortexflow`,
+    owner: "Minotaur App",
+    health: "Gateway route",
+    latency: "Proxied",
     load: 71,
-    version: "v2.8.4",
-    responsibilities: ["License key generation", "Expiration checks", "Customer/product joins", "History timeline"],
-    dependencies: ["Tenant Service", "Product Catalog", "PostgreSQL"],
-    storage: ["licenses", "license_transaction_history"],
-    logs: ["license.created", "license.history.written", "license.expiration.checked"],
-    aiNote: "AI detected validation drift when tenant metadata is absent. Add tenant_id to the signed payload next.",
-    risk: "License keys can be generated without enough tenant context for multi-tenant troubleshooting.",
+    version: "Cortexflow",
+    responsibilities: ["Workflow orchestration", "Data shapes", "AI shapes", "Boomi shapes", "API connector shapes"],
+    dependencies: ["GatewayRBAC", "Decision Engine", "Extractor", "MCA Core API"],
+    storage: ["Cortexflow workspace data", "process definitions"],
+    logs: ["minotaur-cortexflow.request", "workflow.started", "shape.executed"],
+    aiNote: "Cortexflow traffic enters through GatewayRBAC at /proxy/minotaur/cortexflow.",
+    risk: "If MINOTAUR_CORTEXFLOW_HOST is unset or unreachable, the gateway returns 503 or 504 for this app.",
   },
   {
-    id: "billing",
-    name: "Billing Service",
-    icon: CreditCard,
-    status: "expiring",
-    runtime: "Payment API worker",
-    owner: "Revenue Ops",
-    health: "99.42%",
-    latency: "174 ms",
-    load: 82,
-    version: "v1.9.7",
-    responsibilities: ["Payment recording", "Renewal receipts", "Webhook acknowledgement", "Retry handling"],
-    dependencies: ["Payment Provider", "Notification Worker", "PostgreSQL"],
-    storage: ["payments", "webhook_retry_queue"],
-    logs: ["payment.recorded", "webhook.retry", "receipt.dispatch.pending"],
-    aiNote: "AI ranks webhook timeout as the top incident risk. Add idempotency and dead-letter visibility.",
-    risk: "Repeated webhook retries can inflate latency and duplicate support tickets.",
-  },
-  {
-    id: "tenant",
-    name: "Tenant Service",
-    icon: Globe2,
-    status: "valid",
-    runtime: "Tenant metadata resolver",
-    owner: "SaaS Platform",
-    health: "99.95%",
-    latency: "51 ms",
-    load: 48,
-    version: "v1.6.1",
-    responsibilities: ["tenant_id mapping", "host_base_url validation", "Product namespace lookup", "Tenant risk score"],
-    dependencies: ["Product Catalog", "Redis cache", "API Gateway"],
-    storage: ["products", "tenant_host_cache"],
-    logs: ["tenant.resolved", "host_base_url.mismatch", "tenant.cache.refresh"],
-    aiNote: "Host mismatch logs are low volume but high value. AI suggests grouping them by customer and source IP.",
-    risk: "Stale tenant cache can route diagnostics to the wrong product context.",
-  },
-  {
-    id: "ai",
-    name: "AI Diagnostics",
+    id: "sap-hyper-automation",
+    name: "SAP Hyper Automation",
     icon: Bot,
-    status: "trial",
-    runtime: "Log and metric reasoning worker",
-    owner: "Observability Team",
-    health: "98.87%",
-    latency: "682 ms",
-    load: 76,
-    version: "v0.12.0",
-    responsibilities: ["Log clustering", "Root-cause ranking", "Runbook suggestions", "Incident summaries"],
-    dependencies: ["Log Index", "Metrics Store", "Deploy History"],
-    storage: ["ai_findings", "incident_summaries"],
-    logs: ["ai.cluster.created", "ai.rca.generated", "ai.runbook.suggested"],
-    aiNote: "AI confidence improves when request logs include tenant_id, trace_id, statusCode, and durationMs.",
-    risk: "Low-quality logs reduce RCA accuracy and can produce generic troubleshooting steps.",
+    status: "valid",
+    runtime: `${normalizeGatewayBaseUrl(product.hostBaseUrl) || "Gateway"}/proxy/minotaur/sapient`,
+    owner: "Minotaur App",
+    health: "Gateway route",
+    latency: "Proxied",
+    load: 64,
+    version: "SAP Hyper Automation",
+    responsibilities: ["SAP workflow bot", "Invoice automation", "Guided SAP task execution", "Approval handoffs"],
+    dependencies: ["GatewayRBAC", "Dispatcher", "Decision Engine", "Notification Service"],
+    storage: ["SAP workflow state", "automation audit trail"],
+    logs: ["minotaur-sapient.request", "sap.workflow.started", "invoice.automation.step"],
+    aiNote: "SAP Hyper Automation is represented by the gateway sapient route: /proxy/minotaur/sapient.",
+    risk: "Long-running SAP automation needs trace IDs propagated from GatewayRBAC to every workflow step.",
   },
   {
-    id: "data",
-    name: "Data Layer",
+    id: "dispatcher",
+    name: "Minotaur Dispatcher",
+    icon: Server,
+    status: "valid",
+    runtime: `${normalizeGatewayBaseUrl(product.hostBaseUrl) || "Gateway"}/proxy/minotaur/dispatcher`,
+    owner: "Minotaur Platform",
+    health: "Gateway route",
+    latency: "Proxied",
+    load: 52,
+    version: "Dispatcher",
+    responsibilities: ["Route Minotaur jobs", "Coordinate service execution", "Forward request context", "Preserve request id"],
+    dependencies: ["GatewayRBAC", "Cortexflow", "SAP Hyper Automation", "Notification Service"],
+    storage: ["Dispatch queue metadata"],
+    logs: ["minotaur-dispatcher.request", "job.dispatched", "request.context.forwarded"],
+    aiNote: "Dispatcher is the coordination layer reached through /proxy/minotaur/dispatcher.",
+    risk: "If request IDs are not forwarded, audit logs are harder to connect across Minotaur services.",
+  },
+  {
+    id: "decision-engine",
+    name: "Decision Engine",
+    icon: Key,
+    status: "trial",
+    runtime: `${normalizeGatewayBaseUrl(product.hostBaseUrl) || "Gateway"}/proxy/minotaur/decision`,
+    owner: "Minotaur Platform",
+    health: "Gateway route",
+    latency: "Proxied",
+    load: 49,
+    version: "Decision",
+    responsibilities: ["Decision APIs", "Rule execution", "Automation branching", "Runtime validation"],
+    dependencies: ["GatewayRBAC", "Cortexflow", "SAP Hyper Automation"],
+    storage: ["Decision rule metadata"],
+    logs: ["minotaur-decision-engine.request", "decision.evaluated", "rule.matched"],
+    aiNote: "Decision Engine receives traffic through /proxy/minotaur/decision.",
+    risk: "Decision errors can affect both Cortexflow and SAP automation paths.",
+  },
+  {
+    id: "mca-core",
+    name: "MCA Core API",
     icon: Database,
     status: "valid",
-    runtime: "PostgreSQL + Redis",
-    owner: "Infrastructure",
-    health: "99.89%",
-    latency: "33 ms",
-    load: 57,
-    version: "pg15 / redis7",
-    responsibilities: ["Transactional storage", "Tenant cache", "Query performance", "Audit retention"],
-    dependencies: ["License Service", "Billing Service", "Tenant Service"],
-    storage: ["customers", "products", "licenses", "payments"],
-    logs: ["query.slow", "cache.miss", "connection.pool.wait"],
-    aiNote: "AI predicts cache pressure during traffic peaks. Pre-warm tenant and product lookups.",
-    risk: "Slow relational joins can appear as API latency unless traces include query duration.",
+    runtime: `${normalizeGatewayBaseUrl(product.hostBaseUrl) || "Gateway"}/proxy/minotaur/api`,
+    owner: "Minotaur Platform",
+    health: "Gateway route",
+    latency: "Proxied",
+    load: 53,
+    version: "Core API",
+    responsibilities: ["Core Minotaur API", "Shared business data", "Application metadata", "Tenant context"],
+    dependencies: ["GatewayRBAC", "PostgreSQL", "Dispatcher"],
+    storage: ["Core application data"],
+    logs: ["minotaur-mca-core.request", "core.api.called", "tenant.context.resolved"],
+    aiNote: "MCA Core API is the shared API exposed by /proxy/minotaur/api.",
+    risk: "Core API failures can appear as product-wide issues because multiple apps depend on it.",
+  },
+  {
+    id: "extractor",
+    name: "Extractor",
+    icon: FileSearch,
+    status: "valid",
+    runtime: `${normalizeGatewayBaseUrl(product.hostBaseUrl) || "Gateway"}/proxy/minotaur/ext`,
+    owner: "Minotaur Platform",
+    health: "Gateway route",
+    latency: "Proxied",
+    load: 45,
+    version: "Extractor",
+    responsibilities: ["Document extraction", "Data parsing", "Payload enrichment", "Extraction results"],
+    dependencies: ["GatewayRBAC", "Cortexflow", "MCA Core API"],
+    storage: ["Extraction jobs", "parsed payloads"],
+    logs: ["minotaur-extractor.request", "document.extracted", "payload.enriched"],
+    aiNote: "Extractor is reached by GatewayRBAC at /proxy/minotaur/ext.",
+    risk: "Extraction latency can slow workflows if large payloads are proxied through the gateway.",
+  },
+  {
+    id: "notifications",
+    name: "Notification Service",
+    icon: Globe2,
+    status: "valid",
+    runtime: `${normalizeGatewayBaseUrl(product.hostBaseUrl) || "Gateway"}/proxy/minotaur/notif`,
+    owner: "Minotaur Platform",
+    health: "Gateway route",
+    latency: "Proxied",
+    load: 39,
+    version: "Notifications",
+    responsibilities: ["Workflow notifications", "Automation alerts", "Delivery status", "User messaging"],
+    dependencies: ["GatewayRBAC", "Dispatcher", "SAP Hyper Automation"],
+    storage: ["Notification queue", "delivery records"],
+    logs: ["minotaur-notif.request", "notification.sent", "delivery.status.updated"],
+    aiNote: "Notification Service receives traffic through /proxy/minotaur/notif.",
+    risk: "Delivery failures may not block the workflow but can hide important operational events.",
   },
 ]
-
-const serviceLoad = microservices.map((service) => ({
-  service: service.name.replace(" Service", "").replace("API ", ""),
-  load: service.load,
-}))
 
 const aiFindings = [
   {
-    title: "Likely root cause: payment webhook retries",
-    confidence: "91%",
+    title: "Gateway audit stream depends on ACT token",
+    confidence: "92%",
     severity: "High",
-    signal: "Billing p95 latency rose 2.1x while retry logs increased from 7 to 74 events/hour.",
-    action: "Add idempotency keys to webhook processing and push repeated failures to a dead-letter queue.",
+    signal: "The gateway audit endpoint is protected by authn and audit:read authorization.",
+    action: "Store a gateway access token in localStorage as gatewayAccessToken before opening this product screen.",
   },
   {
-    title: "Tenant metadata drift",
+    title: "Host Base URL is the routing source",
     confidence: "84%",
     severity: "Medium",
-    signal: "Several license create attempts are missing tenant_id or host_base_url metadata.",
-    action: "Block submit until tenant metadata is valid and add backend schema validation alarms.",
+    signal: "Product diagnostics call the gateway configured in product.host_base_url.",
+    action: "Keep each product Host Base URL aligned with the deployed GatewayRBAC endpoint.",
   },
   {
-    title: "Cache pressure prediction",
-    confidence: "78%",
+    title: "CORS must allow Licentra origins",
+    confidence: "88%",
     severity: "Medium",
-    signal: "Redis cache hit rate is trending down before peak traffic windows.",
-    action: "Pre-warm tenant product metadata and increase TTL for stable host mappings.",
+    signal: "Local and deployed frontend domains both call the same gateway audit endpoint.",
+    action: "Use FRONT_HOST=* in the gateway for development, or replace it later with a comma-separated allow-list.",
   },
-]
-
-const logClusters = [
-  {
-    label: "401 token failures",
-    count: "428",
-    level: "warn",
-    trace: "auth-7f21",
-    summary: "Expired customer tokens are driving portal redirects after deploy.",
-  },
-  {
-    label: "Payment timeout",
-    count: "91",
-    level: "error",
-    trace: "pay-31ac",
-    summary: "Webhook acknowledgement exceeded provider timeout window.",
-  },
-  {
-    label: "Tenant host mismatch",
-    count: "37",
-    level: "warn",
-    trace: "ten-f09b",
-    summary: "Requests arrived from host_base_url not matching configured tenant.",
-  },
-  {
-    label: "Slow license query",
-    count: "24",
-    level: "info",
-    trace: "lic-55de",
-    summary: "License listing query crosses 250 ms during peak load.",
-  },
-]
-
-const liveLogs = [
-  { time: "16:42:11", level: "ERROR", service: "billing", message: "payment webhook retry exhausted", trace: "pay-31ac" },
-  { time: "16:42:08", level: "WARN", service: "tenant", message: "host_base_url mismatch for tenant-prod-001", trace: "ten-f09b" },
-  { time: "16:41:54", level: "INFO", service: "licenses", message: "license created with signed tenant payload", trace: "lic-55de" },
-  { time: "16:41:21", level: "WARN", service: "auth", message: "expired token used from customer portal", trace: "auth-7f21" },
-  { time: "16:40:57", level: "INFO", service: "gateway", message: "traffic routed to license service", trace: "gw-882a" },
 ]
 
 const aiIdeas = [
@@ -274,6 +270,190 @@ const levelClassName = {
   INFO: "bg-primary/10 text-primary border-primary/30",
 }
 
+const normalizeGatewayBaseUrl = (value) => {
+  const trimmed = String(value || "").trim()
+
+  if (!trimmed) {
+    return ""
+  }
+
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`
+  return withProtocol.replace(/\/+$/, "")
+}
+
+const joinGatewayUrl = (baseUrl, path) => {
+  return `${normalizeGatewayBaseUrl(baseUrl)}/${String(path).replace(/^\/+/, "")}`
+}
+
+const getGatewayAccessToken = () => {
+  if (typeof window === "undefined") {
+    return ""
+  }
+
+  return (
+    window.localStorage.getItem("gatewayAccessToken") ||
+    window.localStorage.getItem("gatewayACT") ||
+    window.sessionStorage.getItem("gatewayAccessToken") ||
+    window.sessionStorage.getItem("gatewayACT") ||
+    ""
+  )
+}
+
+const inferGatewayLogLevel = (log) => {
+  const text = `${log.action || ""} ${log.resource || ""}`.toLowerCase()
+
+  if (/(fail|error|denied|forbidden|expired|invalid)/.test(text)) {
+    return "ERROR"
+  }
+
+  if (/(delete|remove|logout|revoke|disable|update)/.test(text)) {
+    return "WARN"
+  }
+
+  return "INFO"
+}
+
+const formatGatewayLogTime = (value) => {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return "--:--:--"
+  }
+
+  return date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })
+}
+
+const getGatewayLogService = (log) => {
+  const actionPrefix = String(log.action || "").split(".")[0]
+  const resourcePrefix = String(log.resource || "").split(":")[0]
+
+  return actionPrefix || resourcePrefix || "gateway"
+}
+
+const normalizeGatewayAuditLog = (log) => {
+  const level = inferGatewayLogLevel(log)
+  const service = getGatewayLogService(log)
+  const metadata = log.metadata && typeof log.metadata === "object" ? log.metadata : null
+  const metadataSummary = metadata?.via ? ` via ${metadata.via}` : ""
+  const actor = log.actor?.email || (log.actorId ? `actor:${log.actorId}` : "system")
+
+  return {
+    id: log.id,
+    time: formatGatewayLogTime(log.createdAt || log.created_at),
+    level,
+    service,
+    message: `${log.action || "audit.event"} on ${log.resource || "gateway"} by ${actor}${metadataSummary}`,
+    trace: log.requestId || log.request_id || `audit-${log.id}`,
+    raw: log,
+  }
+}
+
+const fetchGatewayAuditLogs = async (hostBaseUrl, { signal } = {}) => {
+  const baseUrl = normalizeGatewayBaseUrl(hostBaseUrl)
+
+  if (!baseUrl) {
+    return { logs: [], total: 0, error: "Product Host Base URL is not configured." }
+  }
+
+  const token = getGatewayAccessToken()
+
+  if (!token) {
+    return {
+      logs: [],
+      total: 0,
+      error: "Gateway audit logs require a gateway access token in localStorage key gatewayAccessToken.",
+    }
+  }
+
+  const response = await fetch(joinGatewayUrl(baseUrl, "/audit-log?page=1&pageSize=12"), {
+    method: "GET",
+    signal,
+    headers: {
+      Accept: "application/json",
+      ACT: token,
+    },
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    const message = response.status === 401 || response.status === 403
+      ? "Gateway rejected the audit log request. Check that gatewayAccessToken is valid and has audit:read permission."
+      : text || `Gateway audit log request failed with status ${response.status}.`
+
+    throw new Error(message)
+  }
+
+  const payload = await response.json()
+  const auditRows = Array.isArray(payload.logs) ? payload.logs : []
+
+  return {
+    logs: auditRows.map(normalizeGatewayAuditLog),
+    total: Number(payload.total || auditRows.length),
+    error: null,
+  }
+}
+
+const buildGatewayLogClusters = (logs) => {
+  const clustersByAction = new Map()
+
+  logs.forEach((log) => {
+    const action = log.raw?.action || log.service || "gateway"
+    const current = clustersByAction.get(action) || {
+      label: action,
+      count: 0,
+      level: log.level.toLowerCase(),
+      trace: log.trace,
+      summary: log.message,
+    }
+
+    current.count += 1
+    if (log.level === "ERROR") current.level = "error"
+    else if (log.level === "WARN" && current.level !== "error") current.level = "warn"
+    clustersByAction.set(action, current)
+  })
+
+  return Array.from(clustersByAction.values())
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 4)
+    .map((cluster) => ({ ...cluster, count: String(cluster.count) }))
+}
+
+const buildProductSignalCards = ({ product, gatewayLogs, gatewayLogState }) => [
+  {
+    label: "Gateway Host",
+    value: product.hostBaseUrl ? "Configured" : "Missing",
+    detail: product.hostBaseUrl || "Set Host Base URL on the product",
+    icon: Network,
+    tone: product.hostBaseUrl ? "text-success" : "text-warning",
+  },
+  {
+    label: "Audit Events",
+    value: gatewayLogState.loading ? "..." : String(gatewayLogState.total || gatewayLogs.length),
+    detail: "Read from gateway audit_logs",
+    icon: Terminal,
+    tone: "text-primary",
+  },
+  {
+    label: "Gateway Auth",
+    value: getGatewayAccessToken() ? "Token set" : "Token missing",
+    detail: "Uses ACT header with audit:read",
+    icon: ShieldCheck,
+    tone: getGatewayAccessToken() ? "text-success" : "text-warning",
+  },
+  {
+    label: "Proxy Routes",
+    value: String(gatewayProxyRoutes.length),
+    detail: "Minotaur and external-service routes",
+    icon: Server,
+    tone: "text-accent",
+  },
+]
+
 function ProductHero({ product }) {
   return (
     <Card className="glass border-border neon-border">
@@ -291,6 +471,9 @@ function ProductHero({ product }) {
               <p className="text-muted-foreground mt-1">{product.runtime}</p>
               <div className="flex flex-wrap gap-2 mt-3">
                 <Badge className="bg-primary/10 text-primary border-primary/30">Tenant: {product.tenantId}</Badge>
+                <Badge className="bg-accent/10 text-accent border-accent/30">
+                  Gateway: {product.hostBaseUrl || "Not configured"}
+                </Badge>
                 <Badge className="bg-secondary/70 text-muted-foreground border-border">Release {product.release}</Badge>
                 <Badge className="bg-success/10 text-success border-success/30">Production</Badge>
               </div>
@@ -298,12 +481,19 @@ function ProductHero({ product }) {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button variant="outline" className="border-border bg-transparent" asChild>
-              <a href={product.hostBaseUrl} target="_blank" rel="noreferrer">
+            {product.hostBaseUrl ? (
+              <Button variant="outline" className="border-border bg-transparent" asChild>
+                <a href={product.hostBaseUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open Gateway
+                </a>
+              </Button>
+            ) : (
+              <Button variant="outline" className="border-border bg-transparent" disabled>
                 <ExternalLink className="w-4 h-4 mr-2" />
-                Open App
-              </a>
-            </Button>
+                Gateway Missing
+              </Button>
+            )}
             <Button className="bg-primary hover:bg-primary/90 text-primary-foreground glow-blue">
               <RefreshCw className="w-4 h-4 mr-2" />
               Run AI Diagnostics
@@ -361,7 +551,9 @@ function TrafficPanel() {
   )
 }
 
-function LogCommandCenter() {
+function LogCommandCenter({ logs }) {
+  const clusters = buildGatewayLogClusters(logs)
+
   return (
     <Card className="glass border-border">
       <CardHeader>
@@ -388,29 +580,35 @@ function LogCommandCenter() {
         </div>
 
         <div className="space-y-3">
-          {logClusters.map((cluster) => (
-            <div key={cluster.trace} className="p-3 rounded-lg bg-secondary/30 border border-border">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileSearch className="w-4 h-4 text-primary shrink-0" />
-                  <p className="font-medium text-foreground truncate">{cluster.label}</p>
+          {clusters.length > 0 ? (
+            clusters.map((cluster) => (
+              <div key={cluster.trace} className="p-3 rounded-lg bg-secondary/30 border border-border">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileSearch className="w-4 h-4 text-primary shrink-0" />
+                    <p className="font-medium text-foreground truncate">{cluster.label}</p>
+                  </div>
+                  <Badge
+                    className={
+                      cluster.level === "error"
+                        ? "bg-destructive/10 text-destructive border-destructive/30"
+                        : cluster.level === "warn"
+                          ? "bg-warning/10 text-warning border-warning/30"
+                          : "bg-primary/10 text-primary border-primary/30"
+                    }
+                  >
+                    {cluster.count}
+                  </Badge>
                 </div>
-                <Badge
-                  className={
-                    cluster.level === "error"
-                      ? "bg-destructive/10 text-destructive border-destructive/30"
-                      : cluster.level === "warn"
-                        ? "bg-warning/10 text-warning border-warning/30"
-                        : "bg-primary/10 text-primary border-primary/30"
-                  }
-                >
-                  {cluster.count}
-                </Badge>
+                <p className="text-sm text-muted-foreground mt-2">{cluster.summary}</p>
+                <code className="text-xs text-primary mt-2 block">trace_id={cluster.trace}</code>
               </div>
-              <p className="text-sm text-muted-foreground mt-2">{cluster.summary}</p>
-              <code className="text-xs text-primary mt-2 block">trace_id={cluster.trace}</code>
+            ))
+          ) : (
+            <div className="p-4 rounded-lg bg-secondary/30 border border-border text-sm text-muted-foreground">
+              No gateway audit clusters are available yet.
             </div>
-          ))}
+          )}
         </div>
       </CardContent>
     </Card>
@@ -450,23 +648,52 @@ function AiAnalysisGrid() {
   )
 }
 
-function LiveLogStream() {
+function LiveLogStream({ logs, state, hostBaseUrl, onRefresh }) {
   return (
     <Card className="glass border-border">
       <CardHeader>
-        <CardTitle className="text-foreground flex items-center gap-2">
-          <Activity className="w-5 h-5 text-primary" />
-          Live Log Stream
-        </CardTitle>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-foreground flex items-center gap-2">
+            <Activity className="w-5 h-5 text-primary" />
+            Live Log Stream
+          </CardTitle>
+          <Button variant="outline" size="sm" className="border-border bg-transparent" onClick={onRefresh} disabled={state.loading || !hostBaseUrl}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${state.loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {liveLogs.map((log) => (
-          <div key={`${log.time}-${log.trace}`} className="grid grid-cols-1 lg:grid-cols-[74px_74px_100px_1fr_96px] gap-3 p-3 rounded-lg code-panel border border-border font-mono text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>Source:</span>
+          <code className="text-primary break-all">{hostBaseUrl ? `${normalizeGatewayBaseUrl(hostBaseUrl)}/audit-log` : "No Host Base URL"}</code>
+        </div>
+
+        {state.error && (
+          <div className="p-3 rounded-lg border border-warning/30 bg-warning/10 text-sm text-warning">
+            {state.error}
+          </div>
+        )}
+
+        {state.loading && (
+          <div className="p-4 rounded-lg code-panel border border-border text-sm text-muted-foreground">
+            Loading gateway audit logs...
+          </div>
+        )}
+
+        {!state.loading && logs.length === 0 && !state.error && (
+          <div className="p-4 rounded-lg code-panel border border-border text-sm text-muted-foreground">
+            No gateway audit logs returned for this product yet.
+          </div>
+        )}
+
+        {!state.loading && logs.map((log) => (
+          <div key={`${log.time}-${log.trace}-${log.id}`} className="grid grid-cols-1 lg:grid-cols-[84px_74px_110px_1fr_140px] gap-3 p-3 rounded-lg code-panel border border-border font-mono text-xs">
             <span className="text-muted-foreground">{log.time}</span>
             <span className={`px-2 py-0.5 rounded border text-center ${levelClassName[log.level]}`}>{log.level}</span>
             <span className="text-accent">{log.service}</span>
             <span>{log.message}</span>
-            <span className="text-primary">{log.trace}</span>
+            <span className="text-primary truncate" title={log.trace}>{log.trace}</span>
           </div>
         ))}
       </CardContent>
@@ -474,9 +701,9 @@ function LiveLogStream() {
   )
 }
 
-function MicroserviceArchitecture() {
-  const [selectedServiceId, setSelectedServiceId] = useState(microservices[0].id)
-  const selectedService = microservices.find((service) => service.id === selectedServiceId) || microservices[0]
+function MicroserviceArchitecture({ services }) {
+  const [selectedServiceId, setSelectedServiceId] = useState(services[0]?.id || "gateway")
+  const selectedService = services.find((service) => service.id === selectedServiceId) || services[0]
   const SelectedIcon = selectedService.icon
 
   return (
@@ -489,7 +716,7 @@ function MicroserviceArchitecture() {
       </CardHeader>
       <CardContent className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-5">
         <div className="space-y-3">
-          {microservices.map((service) => {
+          {services.map((service) => {
             const Icon = service.icon
             const isSelected = service.id === selectedServiceId
 
@@ -633,7 +860,12 @@ function MicroserviceArchitecture() {
   )
 }
 
-function ServiceHealthPanel() {
+function ServiceHealthPanel({ services }) {
+  const serviceLoad = services.map((service) => ({
+    service: service.name.replace(" Service", "").replace("API ", ""),
+    load: service.load,
+  }))
+
   return (
     <Card className="glass border-border">
       <CardHeader>
@@ -654,7 +886,7 @@ function ServiceHealthPanel() {
         </ResponsiveContainer>
 
         <div className="space-y-3">
-          {microservices.slice(0, 4).map((service) => (
+          {services.slice(0, 4).map((service) => (
             <div key={service.name} className="p-3 rounded-lg bg-secondary/30 border border-border">
               <div className="flex items-center justify-between gap-3">
                 <p className="font-medium text-foreground">{service.name}</p>
@@ -708,10 +940,121 @@ function AiIdeasPanel() {
 
 export default function ProductDetailPage() {
   const { id } = useParams()
+  const [productRecord, setProductRecord] = useState(null)
+  const [gatewayLogs, setGatewayLogs] = useState([])
+  const [gatewayLogState, setGatewayLogState] = useState({ loading: false, error: null, total: 0 })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetchProduct = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { data } = await productsApi.get(id)
+      setProductRecord(data)
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Failed to load product details"))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadGatewayLogs = async ({ signal } = {}) => {
+    const hostBaseUrl = productRecord?.host_base_url
+
+    setGatewayLogState((current) => ({ ...current, loading: true, error: null }))
+
+    try {
+      const result = await fetchGatewayAuditLogs(hostBaseUrl, { signal })
+
+      setGatewayLogs(result.logs)
+      setGatewayLogState({
+        loading: false,
+        error: result.error,
+        total: result.total,
+      })
+    } catch (err) {
+      if (err.name === "AbortError") {
+        return
+      }
+
+      setGatewayLogs([])
+      setGatewayLogState({
+        loading: false,
+        error: err.message || "Failed to load gateway audit logs.",
+        total: 0,
+      })
+    }
+  }
+
+  useEffect(() => {
+    fetchProduct()
+  }, [id])
+
+  useEffect(() => {
+    if (!productRecord) {
+      setGatewayLogs([])
+      setGatewayLogState({ loading: false, error: null, total: 0 })
+      return
+    }
+
+    const controller = new AbortController()
+    loadGatewayLogs({ signal: controller.signal })
+
+    return () => controller.abort()
+  }, [productRecord?.host_base_url])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen">
+        <AdminHeader title="Product Details" subtitle={`Product #${id}`} />
+        <div className="p-6">
+          <LoadingState message="Loading product details..." />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen">
+        <AdminHeader title="Product Details" subtitle={`Product #${id}`} />
+        <div className="p-6 space-y-6">
+          <Button variant="ghost" asChild>
+            <Link to="/admin/products">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Products
+            </Link>
+          </Button>
+          <ErrorState message={error} onRetry={fetchProduct} />
+        </div>
+      </div>
+    )
+  }
+
+  if (!productRecord) {
+    return (
+      <div className="min-h-screen">
+        <AdminHeader title="Product Details" subtitle={`Product #${id}`} />
+        <div className="p-6">
+          <EmptyState message="Product not found" />
+        </div>
+      </div>
+    )
+  }
+
   const product = {
     ...productProfile,
-    id,
+    id: productRecord.id || id,
+    name: productRecord.name || productProfile.name,
+    tenantId: productRecord.tenant_id || productProfile.tenantId,
+    hostBaseUrl: productRecord.host_base_url || productProfile.hostBaseUrl,
+    runtime: productRecord.description || productProfile.runtime,
+    release: productRecord.slug || productProfile.release,
   }
+  const gatewayServices = buildGatewayMicroservices(product)
+  const productSignalCards = buildProductSignalCards({ product, gatewayLogs, gatewayLogState })
 
   return (
     <div className="min-h-screen">
@@ -728,23 +1071,28 @@ export default function ProductDetailPage() {
         <ProductHero product={product} />
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {signalCards.map((item) => (
+          {productSignalCards.map((item) => (
             <SignalCard key={item.label} item={item} />
           ))}
         </div>
 
-        <MicroserviceArchitecture />
+        <MicroserviceArchitecture services={gatewayServices} />
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 space-y-6">
             <TrafficPanel />
             <AiAnalysisGrid />
-            <LiveLogStream />
+            <LiveLogStream
+              logs={gatewayLogs}
+              state={gatewayLogState}
+              hostBaseUrl={product.hostBaseUrl}
+              onRefresh={() => loadGatewayLogs()}
+            />
           </div>
 
           <div className="space-y-6">
-            <LogCommandCenter />
-            <ServiceHealthPanel />
+            <LogCommandCenter logs={gatewayLogs} />
+            <ServiceHealthPanel services={gatewayServices} />
           </div>
         </div>
 

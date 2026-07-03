@@ -6,7 +6,7 @@ import { ThemeToggle } from "@/components/ThemeToggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Lock, Mail, Shield, EyeOff } from "lucide-react"
+import { Lock, Mail, Shield, Eye, EyeOff } from "lucide-react"
 import { authApi, getApiErrorMessage } from "@/lib/api"
 import { getDefaultRouteForRole, setAuthSession } from "@/lib/auth"
 
@@ -15,6 +15,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [code2fa, setCode2fa] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -87,7 +88,7 @@ export default function LoginPage() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -95,9 +96,12 @@ export default function LoginPage() {
                 />
                 <button
                   type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  onClick={() => setShowPassword((current) => !current)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  <EyeOff className="w-4 h-4" />
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -125,9 +129,9 @@ export default function LoginPage() {
                 <input type="checkbox" className="rounded border-border bg-input text-primary focus:ring-primary" />
                 <span className="text-muted-foreground">Remember me</span>
               </label>
-              <a href="#" className="text-primary hover:text-primary/80 transition-colors">
+              <Link to="/forgot-password" className="text-primary hover:text-primary/80 transition-colors">
                 Forgot password?
-              </a>
+              </Link>
             </div>
 
             <Button
@@ -152,7 +156,10 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 flex flex-col items-center gap-2 text-center">
+          <Link to="/register" className="text-sm text-primary hover:text-primary/80 transition-colors">
+            Create a Licentra account
+          </Link>
           <Link to="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
             Back to Avaxia Dev
           </Link>

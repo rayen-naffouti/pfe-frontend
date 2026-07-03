@@ -1,29 +1,28 @@
 import { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link } from "react-router-dom"
 import { MinotaurLogo } from "@/components/MinotaurLogo"
 import { ParticlesBackground } from "@/components/ParticlesBackground"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Lock, Mail, Shield, User } from "lucide-react"
+import { CheckCircle2, Lock, Mail, Shield, User } from "lucide-react"
 import { authApi, getApiErrorMessage } from "@/lib/api"
-import { getDefaultRouteForRole, setAuthSession } from "@/lib/auth"
 
 export default function RegisterPage() {
-  const navigate = useNavigate()
-
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
 
   const handleRegister = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError("")
+    setSuccess("")
 
     if (password !== confirmPassword) {
       setError("Passwords do not match")
@@ -38,8 +37,9 @@ export default function RegisterPage() {
         password,
       })
 
-      const role = setAuthSession({ token: data.token, account: data.customer || data.user })
-      navigate(getDefaultRouteForRole(role))
+      setSuccess(data.message || "Account created. Check your email to activate it before signing in")
+      setPassword("")
+      setConfirmPassword("")
     } catch (err) {
       setError(getApiErrorMessage(err, "Registration failed"))
     } finally {
@@ -61,91 +61,109 @@ export default function RegisterPage() {
             <p className="text-sm text-muted-foreground">License Management System</p>
           </div>
 
-          <form className="space-y-6" onSubmit={handleRegister}>
-            {error && (
-              <div className="p-3 rounded-lg text-red-400 border border-red-500/30 bg-red-500/10 text-sm">
-                {error}
+          {success ? (
+            <div className="space-y-6">
+              <div className="rounded-lg border border-success/40 bg-success/10 p-4 text-sm text-success">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                  <span>{success}</span>
+                </div>
               </div>
-            )}
-
-            {/* USERNAME */}
-            <div className="space-y-2">
-              <Label htmlFor="username" className="text-foreground">Username</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="pl-10 bg-input border-border focus:ring-primary focus:border-primary"
-                />
+              <div className="rounded-lg border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+                We sent the activation email to <span className="font-medium text-foreground">{email}</span>. Check
+                your inbox and junk folder, then open the activation link.
               </div>
+              <Button asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+                <Link to="/login">Go to login</Link>
+              </Button>
             </div>
-
-            {/* EMAIL */}
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="user@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 bg-input border-border focus:ring-primary focus:border-primary"
-                />
-              </div>
-            </div>
-
-            {/* PASSWORD */}
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 bg-input border-border focus:ring-primary focus:border-primary"
-                />
-              </div>
-            </div>
-
-            {/* CONFIRM PASSWORD */}
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-foreground">Confirm Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="Re-enter your password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  autoComplete="new-password"
-                  className="pl-10 pr-10 bg-input border-border focus:ring-primary focus:border-primary"
-                />
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="cursor-pointer w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-6 glow-blue transition-all duration-300 hover:scale-[1.02]"
-            >
-              {loading ? "Signing Up..." : (
-                <>
-                  <Lock className="w-4 h-4 mr-2" />
-                  Sign Up Securely
-                </>
+          ) : (
+            <form className="space-y-6" onSubmit={handleRegister}>
+              {error && (
+                <div className="p-3 rounded-lg text-red-400 border border-red-500/30 bg-red-500/10 text-sm">
+                  {error}
+                </div>
               )}
-            </Button>
-          </form>
+
+              {/* USERNAME */}
+              <div className="space-y-2">
+                <Label htmlFor="username" className="text-foreground">Username</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="pl-10 bg-input border-border focus:ring-primary focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              {/* EMAIL */}
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-foreground">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="user@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10 bg-input border-border focus:ring-primary focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              {/* PASSWORD */}
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-foreground">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10 pr-10 bg-input border-border focus:ring-primary focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              {/* CONFIRM PASSWORD */}
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-foreground">Confirm Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Re-enter your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                    className="pl-10 pr-10 bg-input border-border focus:ring-primary focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="cursor-pointer w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-6 glow-blue transition-all duration-300 hover:scale-[1.02]"
+              >
+                {loading ? "Creating account..." : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Create account
+                  </>
+                )}
+              </Button>
+            </form>
+          )}
 
           <div className="mt-6 pt-6 border-t border-border">
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
@@ -156,8 +174,8 @@ export default function RegisterPage() {
         </div>
 
         <div className="mt-6 text-center">
-          <Link to="/" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-            Back to Avaxia Dev
+          <Link to="/login" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+            Already have an account? Sign in
           </Link>
         </div>
       </div>
